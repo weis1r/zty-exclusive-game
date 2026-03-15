@@ -8,6 +8,7 @@ import {
   pickTile,
   restartGame,
 } from './engine'
+import { DEFAULT_LEVEL } from './levels'
 import type { LevelDefinition, TrayTile } from './types'
 
 function createLevel(tiles: LevelDefinition['tiles']): LevelDefinition {
@@ -18,6 +19,20 @@ function createLevel(tiles: LevelDefinition['tiles']): LevelDefinition {
     boardHeight: GAME_CONFIG.boardHeight,
     tiles,
   }
+}
+
+function pickSequence(level: LevelDefinition, tileIds: string[]) {
+  let state = createInitialGameState(level, 'playing')
+
+  for (const tileId of tileIds) {
+    state = pickTile(state, tileId, level, GAME_CONFIG)
+
+    if (state.matchBursts.length > 0) {
+      state = clearResolvedMatches(state)
+    }
+  }
+
+  return state
 }
 
 describe('game engine', () => {
@@ -91,6 +106,73 @@ describe('game engine', () => {
     for (const tile of level.tiles.slice(0, GAME_CONFIG.trayCapacity)) {
       state = pickTile(state, tile.id, level, GAME_CONFIG)
     }
+
+    expect(state.status).toBe('lost')
+    expect(state.trayTiles).toHaveLength(GAME_CONFIG.trayCapacity)
+  })
+
+  it('keeps the default level weighted toward early repeated matches', () => {
+    const typeCounts = DEFAULT_LEVEL.tiles.reduce<Record<string, number>>((counts, tile) => {
+      counts[tile.type] = (counts[tile.type] ?? 0) + 1
+      return counts
+    }, {})
+
+    expect(typeCounts).toEqual({
+      ember: 6,
+      leaf: 6,
+      bloom: 6,
+      bell: 3,
+      cloud: 3,
+      shell: 3,
+    })
+  })
+
+  it('still allows recovery on the default level after an early mixed pick', () => {
+    const state = pickSequence(DEFAULT_LEVEL, [
+      'leaf-1',
+      'ember-1',
+      'ember-2',
+      'ember-3',
+      'leaf-2',
+      'leaf-3',
+      'bloom-1',
+      'bloom-2',
+      'bloom-3',
+      'bell-1',
+      'bell-2',
+      'bell-3',
+      'cloud-1',
+      'cloud-2',
+      'cloud-3',
+      'shell-1',
+      'shell-2',
+      'shell-3',
+      'berry-1',
+      'berry-2',
+      'berry-3',
+      'pine-1',
+      'pine-2',
+      'pine-3',
+      'wave-1',
+      'wave-2',
+      'wave-3',
+    ])
+
+    expect(state.status).toBe('won')
+    expect(state.trayTiles).toHaveLength(0)
+    expect(state.removedCount).toBe(DEFAULT_LEVEL.tiles.length)
+  })
+
+  it('still loses the default level after a clearly greedy spread of picks', () => {
+    const state = pickSequence(DEFAULT_LEVEL, [
+      'ember-1',
+      'leaf-1',
+      'bloom-1',
+      'bell-1',
+      'cloud-1',
+      'shell-1',
+      'berry-1',
+    ])
 
     expect(state.status).toBe('lost')
     expect(state.trayTiles).toHaveLength(GAME_CONFIG.trayCapacity)
