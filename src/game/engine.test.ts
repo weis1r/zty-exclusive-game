@@ -8,7 +8,47 @@ import {
   pickTile,
   restartGame,
 } from './engine'
+import { DEFAULT_LEVEL } from './levels'
 import type { LevelDefinition, TrayTile } from './types'
+
+const DEFAULT_LEVEL_SOLUTION_PATH = [
+  'ember-1',
+  'ember-2',
+  'leaf-1',
+  'ember-3',
+  'leaf-2',
+  'bloom-1',
+  'leaf-3',
+  'bloom-2',
+  'bloom-3',
+  'bell-1',
+  'bell-2',
+  'bell-3',
+  'cloud-1',
+  'cloud-2',
+  'shell-1',
+  'shell-2',
+  'berry-1',
+  'berry-2',
+  'berry-3',
+  'pine-1',
+  'pine-2',
+  'pine-3',
+  'wave-1',
+  'leaf-4',
+  'cloud-3',
+  'wave-2',
+  'bloom-4',
+  'shell-3',
+  'bloom-5',
+  'bloom-6',
+  'leaf-6',
+  'ember-4',
+  'leaf-5',
+  'wave-3',
+  'ember-5',
+  'ember-6',
+] as const
 
 function createLevel(tiles: LevelDefinition['tiles']): LevelDefinition {
   return {
@@ -117,5 +157,51 @@ describe('game engine', () => {
     expect(restartedState.removedCount).toBe(0)
     expect(restartedState.trayTiles).toHaveLength(0)
     expect(restartedState.boardTiles.every((tile) => !tile.removed)).toBe(true)
+  })
+
+  it('ships the default level as a hard 36-tile board with matchable counts', () => {
+    const tileCounts = DEFAULT_LEVEL.tiles.reduce<Record<string, number>>((counts, tile) => {
+      counts[tile.type] = (counts[tile.type] ?? 0) + 1
+      return counts
+    }, {})
+
+    expect(DEFAULT_LEVEL.id).toBe('thorn-garden-01')
+    expect(DEFAULT_LEVEL.name).toBe('荆棘迷圃')
+    expect(DEFAULT_LEVEL.difficulty).toBe('hard')
+    expect(DEFAULT_LEVEL.tiles).toHaveLength(36)
+    expect(Object.values(tileCounts).every((count) => count % GAME_CONFIG.matchCount === 0)).toBe(
+      true,
+    )
+  })
+
+  it('starts the default level with only the top six tiles exposed', () => {
+    const state = createInitialGameState(DEFAULT_LEVEL, 'playing')
+    const exposedTileIds = DEFAULT_LEVEL.tiles
+      .filter((tile) => !isTileBlocked(tile.id, state, GAME_CONFIG))
+      .map((tile) => tile.id)
+      .sort()
+
+    expect(exposedTileIds).toEqual(
+      ['bloom-1', 'bloom-2', 'ember-1', 'ember-2', 'leaf-1', 'leaf-2'].sort(),
+    )
+    expect(DEFAULT_LEVEL.tiles.filter((tile) => isTileBlocked(tile.id, state, GAME_CONFIG))).toHaveLength(
+      30,
+    )
+  })
+
+  it('supports a full winning solution path on the default hard level', () => {
+    let state = createInitialGameState(DEFAULT_LEVEL, 'playing')
+
+    for (const tileId of DEFAULT_LEVEL_SOLUTION_PATH) {
+      state = pickTile(state, tileId, DEFAULT_LEVEL, GAME_CONFIG)
+
+      if (state.matchBursts.length > 0) {
+        state = clearResolvedMatches(state)
+      }
+    }
+
+    expect(state.status).toBe('won')
+    expect(state.trayTiles).toHaveLength(0)
+    expect(state.boardTiles.every((tile) => tile.removed)).toBe(true)
   })
 })

@@ -19,6 +19,12 @@ import type {
   TileDefinition,
 } from './game/types'
 
+const DIFFICULTY_LABELS: Record<NonNullable<LevelDefinition['difficulty']>, string> = {
+  easy: '简单',
+  normal: '普通',
+  hard: '困难',
+}
+
 type GameAction =
   | { type: 'start' }
   | { type: 'pick'; tileId: string }
@@ -71,6 +77,7 @@ export function GameApp({
   level = DEFAULT_LEVEL,
   config = GAME_CONFIG,
 }: GameAppProps) {
+  const difficultyLabel = level.difficulty ? DIFFICULTY_LABELS[level.difficulty] : null
   const [state, dispatch] = useReducer(
     createGameReducer(level, config),
     level,
@@ -138,7 +145,7 @@ export function GameApp({
         {state.status === 'idle' ? (
           <section className="intro-card">
             <div className="intro-card__hero">
-              <span className="intro-badge">花园试炼</span>
+              <span className="intro-badge">{level.name}</span>
               <p className="intro-title">叠层点选，三消过关</p>
               <p className="intro-copy">
                 先点开最上层可见砖块，凑齐 3 个相同图案就会自动消除。
@@ -189,6 +196,12 @@ export function GameApp({
                 <span className="status-label">关卡</span>
                 <strong>{level.name}</strong>
               </div>
+              {difficultyLabel ? (
+                <div className="status-chip">
+                  <span className="status-label">难度</span>
+                  <strong>{difficultyLabel}</strong>
+                </div>
+              ) : null}
               <div className="status-chip">
                 <span className="status-label">已选</span>
                 <strong data-testid="selected-count">{state.selectedCount} 次</strong>
