@@ -19,6 +19,18 @@ import type {
   TileDefinition,
 } from './game/types'
 
+declare global {
+  interface Window {
+    render_game_to_text?: () => string
+  }
+}
+
+const DIFFICULTY_LABELS: Record<NonNullable<LevelDefinition['difficulty']>, string> = {
+  easy: '简单',
+  normal: '普通',
+  hard: '困难',
+}
+
 type GameAction =
   | { type: 'start' }
   | { type: 'pick'; tileId: string }
@@ -71,6 +83,7 @@ export function GameApp({
   level = DEFAULT_LEVEL,
   config = GAME_CONFIG,
 }: GameAppProps) {
+  const difficultyLabel = level.difficulty ? DIFFICULTY_LABELS[level.difficulty] : null
   const [state, dispatch] = useReducer(
     createGameReducer(level, config),
     level,
@@ -97,6 +110,41 @@ export function GameApp({
       window.clearTimeout(timer)
     }
   }, [config.animationMs.matchClear, state.matchBursts.length])
+
+  useEffect(() => {
+    window.render_game_to_text = () =>
+      JSON.stringify({
+        coordinateSystem: {
+          origin: 'top-left',
+          xDirection: 'right',
+          yDirection: 'down',
+        },
+        level: {
+          id: level.id,
+          name: level.name,
+          difficulty: level.difficulty ?? null,
+        },
+        status: state.status,
+        selectedCount: state.selectedCount,
+        removedCount: state.removedCount,
+        trayCapacity: config.trayCapacity,
+        trayTiles: state.trayTiles.map((trayTile) => trayTile.type),
+        remainingCount: getRemainingBoardTiles(state).length,
+        exposedTiles: getRemainingBoardTiles(state)
+          .filter((tile) => !isTileBlocked(tile.id, state, config))
+          .map((tile) => ({
+            id: tile.id,
+            type: tile.type,
+            x: tile.x,
+            y: tile.y,
+            layer: tile.layer,
+          })),
+      })
+
+    return () => {
+      delete window.render_game_to_text
+    }
+  }, [config, level.difficulty, level.id, level.name, state])
 
   const activeBoardTiles = getRemainingBoardTiles(state).sort((leftTile, rightTile) => {
     if (leftTile.layer !== rightTile.layer) {
@@ -138,7 +186,7 @@ export function GameApp({
         {state.status === 'idle' ? (
           <section className="intro-card">
             <div className="intro-card__hero">
-              <span className="intro-badge">花园试炼</span>
+              <span className="intro-badge">{level.name}</span>
               <p className="intro-title">叠层点选，三消过关</p>
               <p className="intro-copy">
                 先点开最上层可见砖块，凑齐 3 个相同图案就会自动消除。
@@ -176,6 +224,7 @@ export function GameApp({
 
             <button
               type="button"
+              id="start-btn"
               className="primary-button"
               onClick={() => dispatch({ type: 'start' })}
             >
@@ -189,6 +238,12 @@ export function GameApp({
                 <span className="status-label">关卡</span>
                 <strong>{level.name}</strong>
               </div>
+              {difficultyLabel ? (
+                <div className="status-chip">
+                  <span className="status-label">难度</span>
+                  <strong>{difficultyLabel}</strong>
+                </div>
+              ) : null}
               <div className="status-chip">
                 <span className="status-label">已选</span>
                 <strong data-testid="selected-count">{state.selectedCount} 次</strong>
