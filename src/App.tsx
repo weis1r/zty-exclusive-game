@@ -19,6 +19,12 @@ import type {
   TileDefinition,
 } from './game/types'
 
+declare global {
+  interface Window {
+    render_game_to_text?: () => string
+  }
+}
+
 const DIFFICULTY_LABELS: Record<NonNullable<LevelDefinition['difficulty']>, string> = {
   easy: '简单',
   normal: '普通',
@@ -105,6 +111,41 @@ export function GameApp({
     }
   }, [config.animationMs.matchClear, state.matchBursts.length])
 
+  useEffect(() => {
+    window.render_game_to_text = () =>
+      JSON.stringify({
+        coordinateSystem: {
+          origin: 'top-left',
+          xDirection: 'right',
+          yDirection: 'down',
+        },
+        level: {
+          id: level.id,
+          name: level.name,
+          difficulty: level.difficulty ?? null,
+        },
+        status: state.status,
+        selectedCount: state.selectedCount,
+        removedCount: state.removedCount,
+        trayCapacity: config.trayCapacity,
+        trayTiles: state.trayTiles.map((trayTile) => trayTile.type),
+        remainingCount: getRemainingBoardTiles(state).length,
+        exposedTiles: getRemainingBoardTiles(state)
+          .filter((tile) => !isTileBlocked(tile.id, state, config))
+          .map((tile) => ({
+            id: tile.id,
+            type: tile.type,
+            x: tile.x,
+            y: tile.y,
+            layer: tile.layer,
+          })),
+      })
+
+    return () => {
+      delete window.render_game_to_text
+    }
+  }, [config, level.difficulty, level.id, level.name, state])
+
   const activeBoardTiles = getRemainingBoardTiles(state).sort((leftTile, rightTile) => {
     if (leftTile.layer !== rightTile.layer) {
       return leftTile.layer - rightTile.layer
@@ -183,6 +224,7 @@ export function GameApp({
 
             <button
               type="button"
+              id="start-btn"
               className="primary-button"
               onClick={() => dispatch({ type: 'start' })}
             >
