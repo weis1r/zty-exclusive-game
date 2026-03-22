@@ -355,6 +355,8 @@
   box-shadow:
     0 20px 32px rgba(125, 73, 113, 0.16),
     inset 0 0 0 2px rgba(255, 255, 255, 0.78);
+  outline: 3px solid rgba(102, 74, 68, 0.16);
+  outline-offset: -6px;
 }
 
 .hero-portrait__sticker,
@@ -409,6 +411,7 @@
   height: auto;
   pointer-events: none;
   user-select: none;
+  filter: drop-shadow(0 10px 14px rgba(103, 73, 80, 0.12));
 }
 
 .chapter-avatar--hero,
@@ -417,12 +420,55 @@
   max-width: 100%;
 }
 
+.chapter-avatar--hero {
+  transform: rotate(-3deg);
+}
+
+.chapter-avatar--focus {
+  transform: rotate(2deg);
+}
+
+.chapter-avatar--modal {
+  transform: rotate(3deg);
+}
+
 .chapter-avatar--card {
   width: 72px;
+  transform: rotate(-5deg);
 }
 
 .chapter-avatar--mini {
   width: 58px;
+  transform: rotate(-4deg);
+}
+
+.chapter-game-avatar {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
+.chapter-game-avatar__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 10px 14px rgba(103, 73, 80, 0.16));
+  transform-origin: center;
+}
+
+.chapter-game-avatar--bar .chapter-game-avatar__svg {
+  transform: rotate(-6deg);
+}
+
+.chapter-game-avatar--win .chapter-game-avatar__svg {
+  transform: rotate(6deg) scale(1.04);
+}
+
+.chapter-game-avatar--loss .chapter-game-avatar__svg {
+  transform: rotate(-7deg) scale(0.98);
 }
 
 .campaign-progress-panel,
@@ -535,9 +581,14 @@
 .campaign-preview__avatar {
   width: 72px;
   height: 72px;
+  display: grid;
+  place-items: center;
+  padding: 4px;
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.85);
   box-shadow: 0 12px 20px rgba(123, 75, 111, 0.14);
+  outline: 2px solid rgba(102, 74, 68, 0.14);
+  outline-offset: -4px;
 }
 
 .campaign-preview__card strong {
@@ -863,9 +914,14 @@
   width: 58px;
   height: 58px;
   flex: none;
+  display: grid;
+  place-items: center;
+  padding: 3px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 12px 20px rgba(111, 80, 117, 0.14);
+  outline: 2px solid rgba(102, 74, 68, 0.12);
+  outline-offset: -4px;
 }
 
 .campaign-bar__progress {
@@ -1113,8 +1169,8 @@
 .tile-card__face {
   display: grid;
   place-items: center;
-  align-content: center;
-  gap: 8px;
+  padding: 8px 6px 6px;
+  overflow: hidden;
   border: 2px solid var(--tile-outline);
   background:
     var(--tile-pattern),
@@ -1124,30 +1180,55 @@
     inset 0 2px 0 rgba(255, 255, 255, 0.9);
 }
 
-.tile-card__badge {
+.tile-card__shine {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  min-width: 1.55rem;
-  padding: 2px 5px;
+  inset: 7px auto auto 10px;
+  width: 28px;
+  height: 16px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.84);
-  color: #7c4c72;
-  font-size: 0.72rem;
-  font-weight: 900;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.25));
+  opacity: 0.88;
+  transform: rotate(-18deg);
+  pointer-events: none;
 }
 
-.tile-card__label {
-  font-size: 1.98rem;
-  font-weight: 900;
-  color: #4f2f4d;
-  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.24);
+.tile-mascot {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
 }
 
-.tile-card__caption {
-  font-size: 0.78rem;
-  color: rgba(91, 51, 78, 0.9);
-  font-weight: 800;
+.tile-mascot__svg {
+  width: min(100%, 68px);
+  height: auto;
+  filter: drop-shadow(0 7px 10px rgba(87, 53, 77, 0.16));
+  transition: transform 160ms ease;
+  transform-origin: center bottom;
+}
+
+.tile-mascot--board-blocked .tile-mascot__svg {
+  transform: translateY(4px) rotate(-6deg) scale(0.94, 0.9);
+}
+
+.tile-mascot--board-hinted .tile-mascot__svg {
+  transform: translateY(-1px) rotate(-5deg) scale(1.06);
+}
+
+.tile-mascot--tray .tile-mascot__svg {
+  transform: rotate(4deg) scale(0.95);
+}
+
+.tile-mascot--burst .tile-mascot__svg {
+  transform: translateY(-3px) rotate(-9deg) scale(1.08);
+}
+
+.tile-mascot--compact .tile-mascot__svg {
+  width: min(100%, 54px);
+}
+
+.tile-card:not(.is-blocked):hover .tile-mascot--board-active .tile-mascot__svg {
+  transform: translateY(-2px) rotate(-3deg) scale(1.03);
 }
 
 .tray-grid {
@@ -1200,23 +1281,12 @@
 }
 
 .tray-tile {
-  color: #57354d;
-  font-size: 1.4rem;
-  font-weight: 900;
   animation: tray-enter var(--entry-duration, 220ms) cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.tray-tile__badge {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  min-width: 1.45rem;
-  padding: 2px 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.86);
-  color: #7d506f;
-  font-size: 0.68rem;
-  font-weight: 900;
+.tray-tile .tile-mascot__svg,
+.match-burst .tile-mascot__svg {
+  filter: drop-shadow(0 5px 8px rgba(87, 53, 77, 0.15));
 }
 
 .match-burst {
@@ -1225,9 +1295,6 @@
 }
 
 .match-burst span {
-  color: #57354d;
-  font-size: 1.4rem;
-  font-weight: 900;
   animation: match-burst 320ms ease forwards;
 }
 

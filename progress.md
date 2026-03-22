@@ -215,3 +215,76 @@ Next suggestions
   - 让章节头像在完成整章时解锁一条专属祝贺文案
   - 给首页 hero 增加按章节切换的轻量过场
   - 再补一轮移动端真机字号与间距微调
+
+---
+
+Follow-up polish
+- 用户追加要求：棋盘砖块不要再用汉字做主视觉，而是换成更有趣的卡通头像。
+- 已在 `src/App.tsx` 新增统一的 `TileMascot` 头像组件：
+  - 棋盘砖块改成头像卡面
+  - 收集槽砖块改成头像缩略卡面
+  - 三消爆发反馈也复用同一套头像表现
+- 本轮没有改动关卡、存档或数值逻辑，只替换了砖块 UI 表现。
+- `src/App.css` 同步调整了砖块卡面布局，移除了原本依赖 `label/title` 的大字展示。
+
+Extra verification
+- `npm run test -- --run`
+- `npm run lint`
+- `npm run build`
+- 自动化截图：
+  - `output/web-game/zty-avatar-campaign-20260322/shot-0.png`
+  - `output/web-game/zty-avatar-level-20260322/shot-0.png`
+- 人工核对结论：
+  - 第 1 关棋盘顶层砖块已显示为卡通头像，不再出现“焰/叶”等大字
+  - 收集槽和棋盘点击区域未受影响
+
+---
+
+Follow-up art direction
+- 用户要求不要直接使用现成 IP 头像，改成“蜡笔小新致敬感”的原创卡通人物风格。
+- 已完成两层统一：
+  - `src/assets/avatar-bloom-scout.svg` 与 `src/assets/avatar-mirror-guide.svg` 重画为幼稚园蜡笔贴纸感的原创章节头像
+  - `src/App.tsx` 的 `TileMascot` 改成更粗描边、夸张眉眼、贴纸式小朋友头像
+- `src/App.css` 同步补了头像外框、轻微倾斜和更像手工作品贴纸的阴影与描边。
+
+Extra verification
+- `npm run test -- --run`
+- `npm run lint`
+- `npm run build`
+- 自动化截图：
+  - `output/web-game/zty-tribute-campaign-20260322/shot-0.png`
+  - `output/web-game/zty-tribute-level-20260322/shot-0.png`
+- 人工核对结论：
+  - 首页主头像已从“精致 Q 版”切到“蜡笔涂鸦贴纸感”原创角色
+  - 棋盘顶层砖块仍保持纯头像表达，没有恢复文字主视觉
+
+---
+
+Follow-up humor polish
+- 用户要求把局内头像继续往“更搞笑、更欠、更有戏”方向拉，但不走抽象怪诞路线。
+- 已完成局内范围的统一升级：
+  - `TileMascot` 增加固定的 `mood` 表情体系：`board-active` / `board-blocked` / `board-hinted` / `tray` / `burst`
+  - 棋盘可点击砖改成更欠揍的夸张表情
+  - 被遮挡砖改成斗鸡眼 / 压扁感的呆滞状态
+  - 收集槽砖改成紧张冒汗表情
+  - 三消爆发改成星星眼 + 大笑庆祝表情
+- 局内章节头像不再复用首页正经头像：
+  - 顶部章节条改成局内专用搞笑头像
+  - 结算弹窗根据胜负切换成“庆祝版 / 崩溃版”头像
+- 首页、章节总览、章节焦点区头像保持原样，本轮未改。
+
+Verification
+- 自动化检查：
+  - `npm run test -- --run`
+  - `npm run lint`
+  - `npm run build`
+- 技能脚本截图：
+  - `output/web-game/humor-campaign-20260322/shot-0.png`
+  - `output/web-game/humor-level-start-20260322/shot-0.png`
+- 人工补测截图：
+  - `/tmp/tray-humor-20260322.png`
+  - `/tmp/result-humor-20260322.png`
+- 核对结果：
+  - 开局棋盘的可点击砖与被遮挡砖已经是不同表情
+  - 收集槽头像和棋盘头像表情明显不同
+  - 结算弹窗头像已切成局内专用搞笑版，不再复用首页头像
