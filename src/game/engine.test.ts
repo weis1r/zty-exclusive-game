@@ -16,45 +16,6 @@ import {
 import { CAMPAIGN_LEVELS, DEFAULT_LEVEL } from './levels'
 import type { LevelDefinition, TrayTile } from './types'
 
-const DEFAULT_LEVEL_SOLUTION_PATH = [
-  'ember-1',
-  'ember-3',
-  'ember-2',
-  'leaf-1',
-  'leaf-3',
-  'leaf-2',
-  'bloom-1',
-  'bloom-2',
-  'bloom-3',
-  'bell-1',
-  'bell-2',
-  'bell-3',
-  'cloud-1',
-  'cloud-2',
-  'shell-1',
-  'shell-2',
-  'berry-1',
-  'berry-2',
-  'berry-3',
-  'pine-1',
-  'pine-2',
-  'pine-3',
-  'wave-1',
-  'leaf-4',
-  'cloud-3',
-  'wave-2',
-  'bloom-4',
-  'shell-3',
-  'bloom-5',
-  'bloom-6',
-  'leaf-6',
-  'ember-4',
-  'leaf-5',
-  'wave-3',
-  'ember-5',
-  'ember-6',
-] as const
-
 function createLevel(tiles: LevelDefinition['tiles']): LevelDefinition {
   return {
     id: 'test-level',
@@ -290,7 +251,7 @@ describe('game engine', () => {
     expect(undoneState.assistCharges.undo).toBe(progressedState.assistCharges.undo - 1)
   })
 
-  it('ships the default level as a normal 36-tile board with matchable counts', () => {
+  it('ships the default level as an easy 36-tile board with matchable counts', () => {
     const tileCounts = DEFAULT_LEVEL.tiles.reduce<Record<string, number>>((counts, tile) => {
       counts[tile.type] = (counts[tile.type] ?? 0) + 1
       return counts
@@ -298,7 +259,7 @@ describe('game engine', () => {
 
     expect(DEFAULT_LEVEL.id).toBe('thorn-garden-01')
     expect(DEFAULT_LEVEL.name).toBe('荆棘迷圃')
-    expect(DEFAULT_LEVEL.difficulty).toBe('normal')
+    expect(DEFAULT_LEVEL.difficulty).toBe('easy')
     expect(DEFAULT_LEVEL.tiles).toHaveLength(36)
     expect(Object.values(tileCounts).every((count) => count % GAME_CONFIG.matchCount === 0)).toBe(
       true,
@@ -333,10 +294,29 @@ describe('game engine', () => {
     })
   })
 
-  it('supports a full winning solution path on the default normal level', () => {
+  it('limits every shipped level to at most four tile types for a calmer palette', () => {
+    const colorHeavyLevels = CAMPAIGN_LEVELS.flatMap((level) => {
+      const uniqueTypeCount = new Set(level.tiles.map((tile) => tile.type)).size
+
+      if (uniqueTypeCount > 4) {
+        return [level.id]
+      }
+
+      return []
+    })
+
+    expect(colorHeavyLevels).toEqual([])
+  })
+
+  it('supports a full winning solution path on the default easy level', () => {
+    const winningPath = findWinningPath(DEFAULT_LEVEL)
+
+    expect(winningPath).not.toBeNull()
+    expect(winningPath).toHaveLength(DEFAULT_LEVEL.tiles.length)
+
     let state = createInitialGameState(DEFAULT_LEVEL, 'playing')
 
-    for (const tileId of DEFAULT_LEVEL_SOLUTION_PATH) {
+    for (const tileId of winningPath ?? []) {
       state = pickTile(state, tileId, DEFAULT_LEVEL, GAME_CONFIG)
 
       if (state.matchBursts.length > 0) {

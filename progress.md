@@ -240,6 +240,40 @@ Extra verification
 
 ---
 
+Task
+- 用户新需求: 游戏难度太高了, 帮我降低下难度, 颜色减少一点, 然后完成任务之后重新提交分支, 再重新推送到 CloudBase。
+
+WIP plan
+- 通过减少每关同时出现的砖块类型来同时降低难度和减少颜色数量。
+- 统一把层叠 36 砖关改成“前六块就是两组三连”的温和起手结构。
+- 提高各关卡的 `startingAssists`，并放宽推荐步数与星级阈值。
+- 验证所有正式关卡仍然可解，再进行提交、合并和 CloudBase 发布。
+
+What changed
+- `src/game/levels.ts`
+  - 新增 `createGentleStackTypes`，把所有 36 砖层叠关统一改成“双三连起手 + 四色以内”的温和结构。
+  - 第 2 关改成仅 3 种砖块类型的 27 砖台阶局。
+  - 第 1-3 关改为 `easy`，第 5-6 关从 `hard` 下调为 `normal`。
+  - 全部关卡提升 `startingAssists`，并放宽推荐步数与星级阈值。
+- `src/game/engine.test.ts`
+  - 默认关卡断言同步改为 `easy`。
+  - 新增“正式关卡最多 4 种砖块类型”的回归测试。
+  - 默认关卡通关验证改为动态搜索可行路径，避免路径写死后和新编排脱节。
+
+Verification
+- `npm run test -- --run`
+- `npm run lint`
+- `npm run build`
+- 技能脚本截图：
+  - `output/web-game/difficulty-tune-20260322/campaign/shot-0.png`
+  - `output/web-game/difficulty-tune-20260322/level-1/shot-0.png`
+- 浏览器实测：
+  - 首页关卡文案已体现“更少颜色 / 更稳起手”。
+  - 第 1 关开局只露出两组三连。
+  - 连点 3 张焰砖后，收集槽会立即清空，下一批暴露砖块依然控制在少量颜色内。
+
+---
+
 Follow-up art direction
 - 用户要求不要直接使用现成 IP 头像，改成“蜡笔小新致敬感”的原创卡通人物风格。
 - 已完成两层统一：
