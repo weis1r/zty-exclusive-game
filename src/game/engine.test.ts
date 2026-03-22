@@ -13,7 +13,7 @@ import {
   useHint,
   useUndo,
 } from './engine'
-import { CAMPAIGN_LEVELS, DEFAULT_LEVEL } from './levels'
+import { CAMPAIGN, CAMPAIGN_LEVELS, DEFAULT_LEVEL, getCampaignChapters } from './levels'
 import type { LevelDefinition, TrayTile } from './types'
 
 function createLevel(tiles: LevelDefinition['tiles']): LevelDefinition {
@@ -251,12 +251,14 @@ describe('game engine', () => {
     expect(undoneState.assistCharges.undo).toBe(progressedState.assistCharges.undo - 1)
   })
 
-  it('ships the default level as an easy 36-tile board with matchable counts', () => {
+  it('ships a 20-level campaign and keeps the default level matchable', () => {
     const tileCounts = DEFAULT_LEVEL.tiles.reduce<Record<string, number>>((counts, tile) => {
       counts[tile.type] = (counts[tile.type] ?? 0) + 1
       return counts
     }, {})
 
+    expect(CAMPAIGN_LEVELS).toHaveLength(20)
+    expect(getCampaignChapters(CAMPAIGN)).toHaveLength(5)
     expect(DEFAULT_LEVEL.id).toBe('thorn-garden-01')
     expect(DEFAULT_LEVEL.name).toBe('荆棘迷圃')
     expect(DEFAULT_LEVEL.difficulty).toBe('easy')
@@ -274,12 +276,12 @@ describe('game engine', () => {
       .sort()
 
     expect(exposedTileIds).toEqual(
-      ['ember-1', 'ember-2', 'ember-3', 'leaf-1', 'leaf-2', 'leaf-3'].sort(),
+      ['bloom-1', 'ember-1', 'ember-2', 'ember-3', 'leaf-1', 'leaf-2'].sort(),
     )
     expect(DEFAULT_LEVEL.tiles.filter((tile) => isTileBlocked(tile.id, state, GAME_CONFIG))).toHaveLength(30)
   })
 
-  it('gives the default level two immediate match options at the start', () => {
+  it('gives the default level one immediate match and two setup tiles at the start', () => {
     const state = createInitialGameState(DEFAULT_LEVEL, 'playing')
     const exposedTypeCounts = DEFAULT_LEVEL.tiles
       .filter((tile) => !isTileBlocked(tile.id, state, GAME_CONFIG))
@@ -290,15 +292,16 @@ describe('game engine', () => {
 
     expect(exposedTypeCounts).toEqual({
       ember: 3,
-      leaf: 3,
+      leaf: 2,
+      bloom: 1,
     })
   })
 
-  it('limits every shipped level to at most four tile types for a calmer palette', () => {
+  it('keeps early levels compact and all shipped levels within six tile types', () => {
     const colorHeavyLevels = CAMPAIGN_LEVELS.flatMap((level) => {
       const uniqueTypeCount = new Set(level.tiles.map((tile) => tile.type)).size
 
-      if (uniqueTypeCount > 4) {
+      if (uniqueTypeCount > 6) {
         return [level.id]
       }
 
@@ -306,6 +309,11 @@ describe('game engine', () => {
     })
 
     expect(colorHeavyLevels).toEqual([])
+
+    const openingChapterLevels = CAMPAIGN_LEVELS.filter((level) => level.campaign?.chapterId === 'chapter-bloom-path')
+    expect(
+      openingChapterLevels.every((level) => new Set(level.tiles.map((tile) => tile.type)).size <= 4),
+    ).toBe(true)
   })
 
   it('supports a full winning solution path on the default easy level', () => {

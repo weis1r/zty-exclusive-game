@@ -148,6 +148,41 @@ describe('campaign helpers and storage', () => {
     ).not.toBeNull()
   })
 
+  it('unlocks newly appended levels when an old save had already cleared the former final stage', () => {
+    window.localStorage.setItem(
+      `brick-match:campaign-progress:${CAMPAIGN.id}`,
+      JSON.stringify({
+        version: 2,
+        campaignId: CAMPAIGN.id,
+        currentChapterId: 'chapter-mirror-court',
+        currentLevelId: 'crown-greenhouse-06',
+        unlockedLevelIds: [
+          'thorn-garden-01',
+          'lantern-steps-02',
+          'ivy-arcade-03',
+          'mirror-court-04',
+          'moon-pond-05',
+          'crown-greenhouse-06',
+        ],
+        completedLevelIds: [
+          'thorn-garden-01',
+          'lantern-steps-02',
+          'ivy-arcade-03',
+          'mirror-court-04',
+          'moon-pond-05',
+          'crown-greenhouse-06',
+        ],
+        chapterRecords: {},
+        levelRecords: {},
+      }),
+    )
+
+    const progress = loadCampaignProgress(CAMPAIGN)
+
+    expect(progress.levelRecords['sunset-orchard-07'].unlocked).toBe(true)
+    expect(progress.unlockedLevelIds).toContain('sunset-orchard-07')
+  })
+
   it('resets persisted progress back to the opening level', () => {
     const campaign = createCampaign()
 

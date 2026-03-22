@@ -166,6 +166,29 @@ function normalizeProgress(
     }
   })
 
+  const propagatedUnlockedLevelIds = new Set(unlockedLevelIds)
+  let changed = true
+
+  while (changed) {
+    changed = false
+
+    completedLevelIds.forEach((levelId) => {
+      const unlockTarget = getUnlockTarget(campaign, levelId)
+
+      if (unlockTarget && !propagatedUnlockedLevelIds.has(unlockTarget)) {
+        propagatedUnlockedLevelIds.add(unlockTarget)
+
+        if (levelRecords[unlockTarget]) {
+          levelRecords[unlockTarget].unlocked = true
+        }
+
+        changed = true
+      }
+    })
+  }
+
+  const normalizedUnlockedLevelIds = [...propagatedUnlockedLevelIds]
+
   const chapterRecords = chapters.reduce<Record<string, ChapterProgressRecord>>(
     (records, chapter, chapterIndex) => {
       const rawChapter = rawProgress.chapterRecords?.[chapter.id]
@@ -237,7 +260,7 @@ function normalizeProgress(
     campaignId: campaign.id,
     currentChapterId,
     currentLevelId,
-    unlockedLevelIds,
+    unlockedLevelIds: normalizedUnlockedLevelIds,
     completedLevelIds,
     levelRecords,
     chapterRecords,

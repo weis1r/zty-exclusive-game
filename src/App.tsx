@@ -128,6 +128,33 @@ const CHAPTER_AVATAR_THEMES: Record<string, ChapterAvatarTheme> = {
     roleName: '镜庭引路人',
     roleTag: '幻彩镜庭向导',
   },
+  'chapter-sunset-orchard': {
+    avatar: avatarBloomScout,
+    ribbon: sparkRibbon,
+    sticker: gardenStickerPack,
+    accent: '#ff9c62',
+    accentSoft: '#ffe7c2',
+    roleName: '晚照小园丁',
+    roleTag: '果园热身领路员',
+  },
+  'chapter-verdant-lab': {
+    avatar: avatarMirrorGuide,
+    ribbon: sparkRibbon,
+    sticker: gardenStickerPack,
+    accent: '#53c79c',
+    accentSoft: '#d6fff1',
+    roleName: '藤影研究员',
+    roleTag: '翠影工房调色师',
+  },
+  'chapter-starlit-canopy': {
+    avatar: avatarMirrorGuide,
+    ribbon: sparkRibbon,
+    sticker: gardenStickerPack,
+    accent: '#8f92ff',
+    accentSoft: '#f0dcff',
+    roleName: '星幕指挥官',
+    roleTag: '秘苑终章向导',
+  },
 }
 
 const DEFAULT_CHAPTER_AVATAR_THEME = CHAPTER_AVATAR_THEMES['chapter-bloom-path']
@@ -159,6 +186,30 @@ const CHAPTER_GAME_AVATAR_SPECS: Record<string, ChapterGameAvatarSpec> = {
     outfit: '#7b88ff',
     ring: '#d6ebff',
     blush: '#ffbfd7',
+  },
+  'chapter-sunset-orchard': {
+    skin: '#ffe0c8',
+    hair: '#ff9b57',
+    accent: '#ffd35d',
+    outfit: '#ff8d5f',
+    ring: '#ffe5bf',
+    blush: '#ffc19a',
+  },
+  'chapter-verdant-lab': {
+    skin: '#f6decf',
+    hair: '#2fa878',
+    accent: '#9ee6b9',
+    outfit: '#36be8f',
+    ring: '#d5fff2',
+    blush: '#f2bcb2',
+  },
+  'chapter-starlit-canopy': {
+    skin: '#ffe3d8',
+    hair: '#7f8fff',
+    accent: '#ffb6ed',
+    outfit: '#676fdd',
+    ring: '#e5e4ff',
+    blush: '#ffc1d8',
   },
 }
 
@@ -1494,7 +1545,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
 
             <div className="intro-rules">
               <div className="rule-chip">专属角色领路</div>
-              <div className="rule-chip">六关双章节</div>
+              <div className="rule-chip">{campaignLevels.length}关 {chapterCount}章节</div>
               <div className="rule-chip">提示 / 撤销道具</div>
             </div>
 
