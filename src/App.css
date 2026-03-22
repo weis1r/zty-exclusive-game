@@ -1064,11 +1064,11 @@
   padding: 16px;
   border-radius: 30px;
   background:
-    linear-gradient(180deg, rgba(75, 53, 95, 0.94), rgba(89, 58, 75, 0.96)),
-    linear-gradient(135deg, color-mix(in srgb, var(--chapter-accent) 28%, transparent), transparent 60%);
+    radial-gradient(circle at 50% -12%, color-mix(in srgb, var(--chapter-accent) 42%, transparent), transparent 42%),
+    linear-gradient(180deg, rgba(39, 34, 69, 0.98), rgba(59, 39, 73, 0.98));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.26),
-    0 22px 38px rgba(94, 54, 83, 0.24);
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 24px 42px rgba(44, 27, 66, 0.34);
 }
 
 .board-shell__sticker {
@@ -1087,12 +1087,12 @@
   margin: 0 auto;
   border-radius: 24px;
   background:
-    radial-gradient(circle at 50% 12%, rgba(255, 242, 193, 0.55), transparent 22%),
-    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.2), transparent 36%),
-    linear-gradient(180deg, rgba(255, 244, 218, 0.96), rgba(228, 211, 255, 0.78));
+    radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.2), transparent 18%),
+    radial-gradient(circle at 50% 34%, color-mix(in srgb, var(--chapter-accent) 12%, rgba(255, 255, 255, 0.08)), transparent 36%),
+    linear-gradient(180deg, rgba(99, 90, 136, 0.96), rgba(74, 65, 116, 0.98));
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.46),
-    inset 0 -24px 40px rgba(98, 70, 115, 0.12);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    inset 0 -24px 40px rgba(24, 19, 43, 0.28);
   overflow: hidden;
   transform: scale(var(--board-scale));
   transform-origin: top center;
@@ -1108,16 +1108,25 @@
 
 .board-surface::before {
   background:
-    radial-gradient(circle at 14% 16%, rgba(255, 255, 255, 0.55), transparent 14%),
-    radial-gradient(circle at 84% 20%, rgba(255, 255, 255, 0.38), transparent 12%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0 38%, transparent 38%);
+    radial-gradient(circle at 14% 16%, rgba(255, 255, 255, 0.18), transparent 13%),
+    radial-gradient(circle at 84% 20%, rgba(255, 255, 255, 0.12), transparent 12%),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.04) 0 1px,
+      transparent 1px 56px
+    ),
+    repeating-linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.04) 0 1px,
+      transparent 1px 56px
+    );
 }
 
 .board-surface::after {
   inset: 14px;
-  border: 2px dashed rgba(255, 255, 255, 0.22);
+  border: 2px dashed rgba(255, 255, 255, 0.12);
   border-radius: 18px;
-  opacity: 0.75;
+  opacity: 0.92;
 }
 
 .tile-card {
@@ -1140,8 +1149,8 @@
 }
 
 .tile-card.is-blocked {
-  opacity: 0.54;
-  filter: saturate(0.7) brightness(0.9);
+  opacity: 0.44;
+  filter: saturate(0.58) brightness(0.78) contrast(0.9);
   cursor: not-allowed;
   transform: translateY(3px);
 }
@@ -1169,15 +1178,46 @@
 .tile-card__face {
   display: grid;
   place-items: center;
+  position: relative;
   padding: 8px 6px 6px;
   overflow: hidden;
-  border: 2px solid var(--tile-outline);
+  border: 2px solid color-mix(in srgb, var(--tile-outline) 88%, white 12%);
   background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.26), transparent 30%),
     var(--tile-pattern),
-    linear-gradient(180deg, var(--tile-accent), color-mix(in srgb, var(--tile-main) 78%, white 22%));
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--tile-accent) 88%, white 12%),
+      color-mix(in srgb, var(--tile-main) 80%, white 20%) 62%,
+      color-mix(in srgb, var(--tile-main) 86%, black 14%)
+    );
   box-shadow:
     0 18px 28px var(--tile-shadow),
-    inset 0 2px 0 rgba(255, 255, 255, 0.9);
+    inset 0 2px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -12px 18px color-mix(in srgb, var(--tile-main) 34%, transparent);
+}
+
+.tile-card__face::before,
+.tile-card__face::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+
+.tile-card__face::before {
+  inset: 5px;
+  border-radius: 17px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+}
+
+.tile-card__face::after {
+  left: 10px;
+  right: 10px;
+  bottom: 8px;
+  height: 11px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tile-main) 74%, black 26%);
+  opacity: 0.2;
 }
 
 .tile-card__shine {
@@ -1192,6 +1232,31 @@
   pointer-events: none;
 }
 
+.tile-card__badge,
+.tray-tile__badge,
+.match-burst__badge {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1.5px solid color-mix(in srgb, var(--tile-outline) 72%, white 28%);
+  color: color-mix(in srgb, var(--tile-main) 82%, #45345a 18%);
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 8px 14px rgba(55, 35, 76, 0.16);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.tile-card__badge {
+  top: 7px;
+  right: 7px;
+  width: 24px;
+  height: 24px;
+  font-size: 0.92rem;
+}
+
 .tile-mascot {
   display: grid;
   place-items: center;
@@ -1202,7 +1267,7 @@
 .tile-mascot__svg {
   width: min(100%, 68px);
   height: auto;
-  filter: drop-shadow(0 7px 10px rgba(87, 53, 77, 0.16));
+  filter: drop-shadow(0 8px 10px rgba(36, 22, 58, 0.2));
   transition: transform 160ms ease;
   transform-origin: center bottom;
 }
@@ -1254,13 +1319,20 @@
   width: 4.1rem;
   height: 4.65rem;
   border-radius: 18px;
-  border: 2px solid var(--tile-outline);
+  border: 2px solid color-mix(in srgb, var(--tile-outline) 88%, white 12%);
   background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24), transparent 28%),
     var(--tile-pattern),
-    linear-gradient(180deg, var(--tile-accent), color-mix(in srgb, var(--tile-main) 78%, white 22%));
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--tile-accent) 88%, white 12%),
+      color-mix(in srgb, var(--tile-main) 80%, white 20%) 62%,
+      color-mix(in srgb, var(--tile-main) 86%, black 14%)
+    );
   box-shadow:
     0 14px 22px var(--tile-shadow),
-    inset 0 2px 0 rgba(255, 255, 255, 0.88);
+    inset 0 2px 0 rgba(255, 255, 255, 0.88),
+    inset 0 -10px 16px color-mix(in srgb, var(--tile-main) 34%, transparent);
 }
 
 .tray-slot__placeholder,
@@ -1276,7 +1348,7 @@
 .tray-slot__placeholder {
   border: 2px dashed rgba(196, 150, 184, 0.4);
   background:
-    linear-gradient(180deg, rgba(255, 247, 235, 0.82), rgba(247, 233, 255, 0.72));
+    linear-gradient(180deg, rgba(253, 249, 255, 0.84), rgba(227, 221, 248, 0.72));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
@@ -1287,6 +1359,15 @@
 .tray-tile .tile-mascot__svg,
 .match-burst .tile-mascot__svg {
   filter: drop-shadow(0 5px 8px rgba(87, 53, 77, 0.15));
+}
+
+.tray-tile__badge,
+.match-burst__badge {
+  top: 5px;
+  right: 5px;
+  width: 18px;
+  height: 18px;
+  font-size: 0.72rem;
 }
 
 .match-burst {

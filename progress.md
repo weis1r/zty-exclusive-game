@@ -322,3 +322,32 @@ Verification
   - 开局棋盘的可点击砖与被遮挡砖已经是不同表情
   - 收集槽头像和棋盘头像表情明显不同
   - 结算弹窗头像已切成局内专用搞笑版，不再复用首页头像
+
+---
+
+Task
+- 用户新需求: 继续优化美术，重点解决“局内各个颜色太相近”的问题。
+
+What changed
+- `src/game/config.ts`
+  - 重新拉开 9 类砖块的主色、描边和阴影差异，重点把 `leaf / pine`、`cloud / shell / wave` 这几组原本接近的色相彻底拆开。
+  - 保留原有 `badge` 字段，并把底纹改得更有各自类型特征。
+- `src/App.tsx`
+  - 新增 `TileThemeBadge`，给棋盘砖块、收集槽砖块、三消爆发砖块都加了图形角标，不用汉字也能更快辨识类别。
+  - 调整 `TILE_MASCOT_SPECS`，让每类头像的头发色和辅色也跟着拉开，不再像“同一组角色换衣服”。
+- `src/App.css`
+  - 棋盘外框和内板改成更深的紫蓝舞台底，降低底板对暖色砖块的干扰。
+  - 砖块卡面加强双色渐变、底部压色、内边框和高对比描边。
+  - 新增角标样式，并增强 blocked 状态的降饱和表现。
+
+Verification
+- `npm run test -- --run`
+- `npm run lint`
+- `npm run build`
+- 技能脚本截图：
+  - `output/web-game/color-pass-20260323/campaign/shot-0.png`
+  - `output/web-game/color-pass-20260323/level-1/shot-0.png`
+- 核对结果：
+  - 第 1 关顶层橙色与绿色砖块的区分已经明显拉开。
+  - 深色棋盘底让卡面更突出，不再和奶白底混在一起。
+  - 小图形角标能辅助识别，不会把视觉又拉回文字化。

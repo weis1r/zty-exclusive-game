@@ -177,8 +177,8 @@ interface TileMascotSpec {
 const TILE_MASCOT_SPECS: Record<TileType, TileMascotSpec> = {
   ember: {
     skin: '#ffe6c7',
-    fringe: '#ff994d',
-    accent: '#ff6b4d',
+    fringe: '#ff7d29',
+    accent: '#ff5d42',
     blush: '#ffb49f',
     eyes: 'bright',
     mouth: 'open',
@@ -186,8 +186,8 @@ const TILE_MASCOT_SPECS: Record<TileType, TileMascotSpec> = {
   },
   leaf: {
     skin: '#fff0dc',
-    fringe: '#6dcf7c',
-    accent: '#98ec9e',
+    fringe: '#53c736',
+    accent: '#b9f97c',
     blush: '#f4c6a4',
     eyes: 'smile',
     mouth: 'smile',
@@ -195,8 +195,8 @@ const TILE_MASCOT_SPECS: Record<TileType, TileMascotSpec> = {
   },
   bloom: {
     skin: '#fff0e2',
-    fringe: '#ff8fba',
-    accent: '#ffc1de',
+    fringe: '#ff5fa8',
+    accent: '#ffb6de',
     blush: '#ffbfd3',
     eyes: 'bright',
     mouth: 'smile',
@@ -204,8 +204,8 @@ const TILE_MASCOT_SPECS: Record<TileType, TileMascotSpec> = {
   },
   bell: {
     skin: '#fff0c9',
-    fringe: '#ffcb56',
-    accent: '#ffe69f',
+    fringe: '#ffc730',
+    accent: '#fff09a',
     blush: '#f9c18f',
     eyes: 'gentle',
     mouth: 'open',
@@ -213,17 +213,17 @@ const TILE_MASCOT_SPECS: Record<TileType, TileMascotSpec> = {
   },
   cloud: {
     skin: '#f8f5ff',
-    fringe: '#8fc7ff',
-    accent: '#dff2ff',
-    blush: '#d9caf7',
+    fringe: '#6a91ff',
+    accent: '#d9e5ff',
+    blush: '#ced4ff',
     eyes: 'sleepy',
     mouth: 'tiny',
     brows: 'sleepy',
   },
   shell: {
     skin: '#fff4e7',
-    fringe: '#7fd7ca',
-    accent: '#b4f1e7',
+    fringe: '#2fc9af',
+    accent: '#b2f7e8',
     blush: '#f4c6bf',
     eyes: 'gentle',
     mouth: 'cat',
@@ -231,8 +231,8 @@ const TILE_MASCOT_SPECS: Record<TileType, TileMascotSpec> = {
   },
   berry: {
     skin: '#fff0f6',
-    fringe: '#c57bff',
-    accent: '#efc9ff',
+    fringe: '#9559ff',
+    accent: '#edbcff',
     blush: '#ffc0dc',
     eyes: 'wink',
     mouth: 'smile',
@@ -240,18 +240,18 @@ const TILE_MASCOT_SPECS: Record<TileType, TileMascotSpec> = {
   },
   pine: {
     skin: '#eef8e8',
-    fringe: '#59bf8b',
-    accent: '#a2e7be',
-    blush: '#cadbaf',
+    fringe: '#16925d',
+    accent: '#9de0ac',
+    blush: '#b7d29d',
     eyes: 'smile',
     mouth: 'cat',
     brows: 'cheer',
   },
   wave: {
     skin: '#eefcff',
-    fringe: '#47c7e8',
-    accent: '#9ceffc',
-    blush: '#beddf0',
+    fringe: '#17d3ff',
+    accent: '#97f5ff',
+    blush: '#b5e8f0',
     eyes: 'gentle',
     mouth: 'smile',
     brows: 'soft',
@@ -706,6 +706,20 @@ function TileMascot({
         </g>
         {renderTileMascotMoodDecor(mood, theme)}
       </svg>
+    </span>
+  )
+}
+
+function TileThemeBadge({
+  badge,
+  className,
+}: {
+  badge: string
+  className: string
+}) {
+  return (
+    <span className={className} aria-hidden="true">
+      {badge}
     </span>
   )
 }
@@ -1728,6 +1742,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                       <span className="tile-card__shadow" aria-hidden="true" />
                       <span className="tile-card__face">
                         <span className="tile-card__shine" aria-hidden="true" />
+                        <TileThemeBadge badge={theme.badge} className="tile-card__badge" />
                         <TileMascot
                           tileType={tile.type}
                           theme={theme}
@@ -1780,6 +1795,10 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                             } as CSSProperties
                           }
                         >
+                          <TileThemeBadge
+                            badge={TILE_THEMES[trayTile.type].badge}
+                            className="tray-tile__badge"
+                          />
                           <TileMascot
                             tileType={trayTile.type}
                             theme={TILE_THEMES[trayTile.type]}
@@ -1811,7 +1830,11 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                           '--tile-pattern': TILE_THEMES[burst.type].pattern,
                         } as CSSProperties
                       }
-                      >
+                    >
+                      <TileThemeBadge
+                        badge={TILE_THEMES[burst.type].badge}
+                        className="match-burst__badge"
+                      />
                       <TileMascot
                         tileType={burst.type}
                         theme={TILE_THEMES[burst.type]}
