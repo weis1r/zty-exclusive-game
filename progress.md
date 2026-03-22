@@ -199,4 +199,19 @@ Verification
 Open notes
 - 头像采用原创通用角色头肩像，不依赖外部图片或真人照片资源。
 - 当前首页主视觉刻意偏手游活动海报风格；如果后续还想继续压缩信息密度，可以优先再收一点 hero 的高度，而不是删掉章节头像。
-- GitHub 仓库网页改名仍需单独确认权限与实际推送结果；代码层改名与应用显示名已全部完成。
+- 代码层改名与应用显示名已全部完成。
+
+Delivery outcome
+- 本地提交:
+  - `0297312 feat: ship zty exclusive game v2.2`
+- 已推送到远端:
+  - `origin/main` -> `0297312`
+- GitHub 仓库已从 `weis1r/0313gametest` 改名为 `weis1r/zty-exclusive-game`
+- 本地 remote 已更新为:
+  - `https://github.com/weis1r/zty-exclusive-game.git`
+
+Next suggestions
+- 如果后面继续做“专属感”增强，优先方向可以是：
+  - 让章节头像在完成整章时解锁一条专属祝贺文案
+  - 给首页 hero 增加按章节切换的轻量过场
+  - 再补一轮移动端真机字号与间距微调
