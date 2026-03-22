@@ -1,0 +1,33 @@
+<svg width="320" height="320" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="40" y1="34" x2="284" y2="286" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF5C9"/>
+      <stop offset="0.48" stop-color="#FFD194"/>
+      <stop offset="1" stop-color="#FF9D73"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="58" y1="42" x2="270" y2="282" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF8A45"/>
+      <stop offset="1" stop-color="#55C981"/>
+    </linearGradient>
+    <linearGradient id="coat" x1="96" y1="195" x2="220" y2="287" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4BD082"/>
+      <stop offset="1" stop-color="#1D9155"/>
+    </linearGradient>
+  </defs>
+  <circle cx="160" cy="160" r="138" fill="url(#bg)"/>
+  <circle cx="160" cy="160" r="120" fill="none" stroke="url(#ring)" stroke-width="12"/>
+  <path d="M62 104C88 62 138 40 190 50C232 58 270 88 282 126C262 108 238 101 212 104C194 77 160 66 132 76C106 84 85 105 62 104Z" fill="#52B96E"/>
+  <path d="M236 122C249 104 273 100 291 116C279 138 254 145 236 122Z" fill="#FF9F5C"/>
+  <circle cx="161" cy="148" r="62" fill="#FFD7B0"/>
+  <path d="M101 146C102 108 132 81 170 81C198 81 223 96 234 122C221 120 211 118 198 108C178 92 149 93 127 107C113 116 108 129 101 146Z" fill="#5A3E31"/>
+  <path d="M130 170C138 160 146 156 156 158C164 160 171 165 177 173C168 182 160 186 149 186C141 186 134 181 130 170Z" fill="#FFB5A3"/>
+  <circle cx="136" cy="149" r="6" fill="#473027"/>
+  <circle cx="188" cy="149" r="6" fill="#473027"/>
+  <path d="M142 197C154 206 169 207 181 197" stroke="#C46F62" stroke-width="8" stroke-linecap="round"/>
+  <path d="M84 279C88 232 116 206 160 206C204 206 232 232 236 279H84Z" fill="url(#coat)"/>
+  <path d="M112 233C126 245 144 251 160 251C176 251 194 245 208 233" stroke="#EFFFF5" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="93" cy="85" r="18" fill="#FFF2C1"/>
+  <path d="M93 59L98 74L113 79L98 84L93 99L88 84L73 79L88 74L93 59Z" fill="#FFB647"/>
+  <path d="M230 58C217 69 215 86 223 100C240 95 252 81 252 64C244 59 238 57 230 58Z" fill="#6ED68B"/>
+  <path d="M246 194L257 205L273 201L265 216L273 231L257 227L246 238L244 221L229 216L244 211L246 194Z" fill="#FFF3D3"/>
+</svg>

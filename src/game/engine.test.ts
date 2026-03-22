@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { GAME_CONFIG } from './config'
 import {
+  canUseUndo,
   clearResolvedMatches,
   createInitialGameState,
+  getRemainingBoardTiles,
+  getHintSuggestion,
   insertIntoTray,
   isTileBlocked,
   pickTile,
   restartGame,
+  useHint,
+  useUndo,
 } from './engine'
-import { DEFAULT_LEVEL } from './levels'
+import { CAMPAIGN_LEVELS, DEFAULT_LEVEL } from './levels'
 import type { LevelDefinition, TrayTile } from './types'
 
 const DEFAULT_LEVEL_SOLUTION_PATH = [
@@ -58,6 +63,92 @@ function createLevel(tiles: LevelDefinition['tiles']): LevelDefinition {
     boardHeight: GAME_CONFIG.boardHeight,
     tiles,
   }
+}
+
+function serializeState(level: LevelDefinition, state: ReturnType<typeof createInitialGameState>) {
+  const removedTiles = level.tiles
+    .filter((tile) => state.boardTiles.find((boardTile) => boardTile.id === tile.id)?.removed)
+    .map((tile) => tile.id)
+    .join(',')
+
+  return `${removedTiles}|${state.trayTiles.map((tile) => tile.type).join(',')}|${state.status}`
+}
+
+function getExposedTilesByPriority(
+  state: ReturnType<typeof createInitialGameState>,
+) {
+  const trayTypeCounts = state.trayTiles.reduce<Map<string, number>>((counts, tile) => {
+    counts.set(tile.type, (counts.get(tile.type) ?? 0) + 1)
+    return counts
+  }, new Map())
+
+  return getRemainingBoardTiles(state)
+    .filter((tile) => !isTileBlocked(tile.id, state, GAME_CONFIG))
+    .sort((leftTile, rightTile) => {
+      const leftTrayCount = trayTypeCounts.get(leftTile.type) ?? 0
+      const rightTrayCount = trayTypeCounts.get(rightTile.type) ?? 0
+
+      if (leftTrayCount !== rightTrayCount) {
+        return rightTrayCount - leftTrayCount
+      }
+
+      if (leftTile.layer !== rightTile.layer) {
+        return rightTile.layer - leftTile.layer
+      }
+
+      if (leftTile.y !== rightTile.y) {
+        return leftTile.y - rightTile.y
+      }
+
+      return leftTile.x - rightTile.x
+    })
+}
+
+function findWinningPath(level: LevelDefinition, maxVisited = 300_000): string[] | null {
+  const seenStates = new Set<string>()
+  let visitedCount = 0
+
+  function search(
+    state: ReturnType<typeof createInitialGameState>,
+  ): string[] | null {
+    const settledState =
+      state.matchBursts.length > 0 ? clearResolvedMatches(state) : state
+
+    if (settledState.status === 'won') {
+      return []
+    }
+
+    if (settledState.status === 'lost') {
+      return null
+    }
+
+    const stateKey = serializeState(level, settledState)
+
+    if (seenStates.has(stateKey) || visitedCount >= maxVisited) {
+      return null
+    }
+
+    seenStates.add(stateKey)
+    visitedCount += 1
+
+    for (const tile of getExposedTilesByPriority(settledState)) {
+      const nextState = pickTile(settledState, tile.id, level, GAME_CONFIG)
+
+      if (nextState === settledState) {
+        continue
+      }
+
+      const nextPath = search(nextState)
+
+      if (nextPath) {
+        return [tile.id, ...nextPath]
+      }
+    }
+
+    return null
+  }
+
+  return search(createInitialGameState(level, 'playing'))
 }
 
 describe('game engine', () => {
@@ -159,6 +250,46 @@ describe('game engine', () => {
     expect(restartedState.boardTiles.every((tile) => !tile.removed)).toBe(true)
   })
 
+  it('recommends a matching tile and consumes a hint charge', () => {
+    const level = createLevel([
+      { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
+      { id: 'ember-2', type: 'ember', x: 80, y: 0, layer: 0 },
+      { id: 'ember-3', type: 'ember', x: 160, y: 0, layer: 0 },
+      { id: 'leaf-1', type: 'leaf', x: 0, y: 100, layer: 0 },
+    ])
+
+    let state = createInitialGameState(level, 'playing')
+    state = pickTile(state, 'ember-1', level, GAME_CONFIG)
+
+    const suggestion = getHintSuggestion(state, GAME_CONFIG)
+    const hintedState = useHint(state, GAME_CONFIG)
+
+    expect(suggestion).toEqual({
+      tileId: 'ember-2',
+      type: 'ember',
+      reason: 'tray-setup',
+    })
+    expect(hintedState.lastHintTileId).toBe('ember-2')
+    expect(hintedState.assistCharges.hint).toBe(state.assistCharges.hint - 1)
+  })
+
+  it('restores the previous snapshot when undo is used', () => {
+    const level = createLevel([
+      { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
+      { id: 'leaf-1', type: 'leaf', x: 80, y: 0, layer: 0 },
+    ])
+
+    const startedState = createInitialGameState(level, 'playing')
+    const progressedState = pickTile(startedState, 'ember-1', level, GAME_CONFIG)
+    const undoneState = useUndo(progressedState)
+
+    expect(canUseUndo(progressedState)).toBe(true)
+    expect(undoneState.selectedCount).toBe(0)
+    expect(undoneState.trayTiles).toHaveLength(0)
+    expect(undoneState.boardTiles.every((tile) => !tile.removed)).toBe(true)
+    expect(undoneState.assistCharges.undo).toBe(progressedState.assistCharges.undo - 1)
+  })
+
   it('ships the default level as a normal 36-tile board with matchable counts', () => {
     const tileCounts = DEFAULT_LEVEL.tiles.reduce<Record<string, number>>((counts, tile) => {
       counts[tile.type] = (counts[tile.type] ?? 0) + 1
@@ -216,5 +347,19 @@ describe('game engine', () => {
     expect(state.status).toBe('won')
     expect(state.trayTiles).toHaveLength(0)
     expect(state.boardTiles.every((tile) => tile.removed)).toBe(true)
+  })
+
+  it('keeps every shipped campaign level solvable', () => {
+    const unsolvedLevels = CAMPAIGN_LEVELS.flatMap((level) => {
+      const winningPath = findWinningPath(level)
+
+      if (!winningPath || winningPath.length !== level.tiles.length) {
+        return [level.id]
+      }
+
+      return []
+    })
+
+    expect(unsolvedLevels).toEqual([])
   })
 })

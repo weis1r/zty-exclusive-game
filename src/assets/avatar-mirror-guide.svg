@@ -1,0 +1,32 @@
+<svg width="320" height="320" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="46" y1="38" x2="278" y2="292" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D7F0FF"/>
+      <stop offset="0.5" stop-color="#A9D7FF"/>
+      <stop offset="1" stop-color="#F8B8D7"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="60" y1="40" x2="268" y2="288" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#57C0FF"/>
+      <stop offset="1" stop-color="#FF7CB8"/>
+    </linearGradient>
+    <linearGradient id="cape" x1="103" y1="196" x2="227" y2="288" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#70B8FF"/>
+      <stop offset="1" stop-color="#5F6DFF"/>
+    </linearGradient>
+  </defs>
+  <circle cx="160" cy="160" r="138" fill="url(#bg)"/>
+  <circle cx="160" cy="160" r="120" fill="none" stroke="url(#ring)" stroke-width="12"/>
+  <path d="M73 123C86 84 121 56 165 56C206 56 245 82 254 121C236 113 223 112 209 116C198 91 174 78 148 79C118 81 90 99 73 123Z" fill="#5667D4"/>
+  <circle cx="160" cy="148" r="61" fill="#FFE0CF"/>
+  <path d="M105 147C106 108 136 82 174 82C201 82 225 96 235 121C225 120 216 118 205 110C191 100 174 95 157 97C136 100 120 112 105 147Z" fill="#314288"/>
+  <path d="M129 173C137 161 146 157 157 159C166 160 173 166 179 175C171 184 162 188 151 188C141 188 134 183 129 173Z" fill="#FFC2C2"/>
+  <circle cx="137" cy="150" r="6" fill="#3D2B37"/>
+  <circle cx="187" cy="150" r="6" fill="#3D2B37"/>
+  <path d="M144 196C154 204 168 205 177 196" stroke="#B36784" stroke-width="8" stroke-linecap="round"/>
+  <path d="M88 280C91 233 118 206 160 206C202 206 229 233 232 280H88Z" fill="url(#cape)"/>
+  <path d="M112 236C126 247 143 253 160 253C177 253 194 247 208 236" stroke="#F4F7FF" stroke-width="10" stroke-linecap="round"/>
+  <path d="M87 74L91 86L103 90L91 94L87 106L83 94L71 90L83 86L87 74Z" fill="#FFF7C6"/>
+  <path d="M235 70L238 79L248 83L238 87L235 96L232 87L222 83L232 79L235 70Z" fill="#FFF7C6"/>
+  <path d="M253 111L259 127L276 133L259 139L253 156L247 139L230 133L247 127L253 111Z" fill="#FF9ED0"/>
+  <path d="M61 197C78 181 100 175 122 180C109 203 85 218 61 214V197Z" fill="#6EC6FF"/>
+</svg>
