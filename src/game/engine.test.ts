@@ -112,6 +112,20 @@ function findWinningPath(level: LevelDefinition, maxVisited = 300_000): string[]
   return search(createInitialGameState(level, 'playing'))
 }
 
+function getLevelUniqueTypeCount(level: LevelDefinition) {
+  return new Set(level.tiles.map((tile) => tile.type)).size
+}
+
+function getOpeningUniqueTypeCount(level: LevelDefinition) {
+  const state = createInitialGameState(level, 'playing')
+
+  return new Set(
+    level.tiles
+      .filter((tile) => !isTileBlocked(tile.id, state, GAME_CONFIG))
+      .map((tile) => tile.type),
+  ).size
+}
+
 describe('game engine', () => {
   it('marks lower overlapping tiles as blocked', () => {
     const level = createLevel([
@@ -297,23 +311,56 @@ describe('game engine', () => {
     })
   })
 
-  it('keeps early levels compact and all shipped levels within six tile types', () => {
-    const colorHeavyLevels = CAMPAIGN_LEVELS.flatMap((level) => {
-      const uniqueTypeCount = new Set(level.tiles.map((tile) => tile.type)).size
+  it('ramps tile variety across all 20 levels and gives chapter finais more visible icons', () => {
+    const expectedTypeCurve = [4, 4, 5, 5, 5, 6, 5, 5, 6, 6, 5, 5, 5, 6, 6, 5, 5, 5, 6, 6]
+    const uniqueTypeCounts = CAMPAIGN_LEVELS.map((level) => getLevelUniqueTypeCount(level))
 
-      if (uniqueTypeCount > 6) {
-        return [level.id]
-      }
+    expect(uniqueTypeCounts).toEqual(expectedTypeCurve)
+    expect(uniqueTypeCounts.every((count) => count <= 6)).toBe(true)
 
-      return []
-    })
+    for (const chapter of getCampaignChapters(CAMPAIGN)) {
+      const chapterLevels = CAMPAIGN_LEVELS.filter((level) => level.campaign?.chapterId === chapter.id)
+      const finaleStartIndex = chapterLevels.length === 3 ? chapterLevels.length - 1 : chapterLevels.length - 2
+      const earlierLevels = chapterLevels.slice(0, finaleStartIndex)
+      const finaleLevels = chapterLevels.slice(finaleStartIndex)
 
-    expect(colorHeavyLevels).toEqual([])
+      const earlierTypeMax = Math.max(...earlierLevels.map((level) => getLevelUniqueTypeCount(level)))
+      const finaleTypeMin = Math.min(...finaleLevels.map((level) => getLevelUniqueTypeCount(level)))
+      const earlierOpeningMax = Math.max(
+        ...earlierLevels.map((level) => getOpeningUniqueTypeCount(level)),
+      )
+      const finaleOpeningMin = Math.min(
+        ...finaleLevels.map((level) => getOpeningUniqueTypeCount(level)),
+      )
 
-    const openingChapterLevels = CAMPAIGN_LEVELS.filter((level) => level.campaign?.chapterId === 'chapter-bloom-path')
-    expect(
-      openingChapterLevels.every((level) => new Set(level.tiles.map((tile) => tile.type)).size <= 4),
-    ).toBe(true)
+      expect(finaleTypeMin).toBeGreaterThan(earlierTypeMax)
+      expect(finaleOpeningMin).toBeGreaterThan(earlierOpeningMax)
+    }
+  })
+
+  it('keeps assist charges on the intended campaign curve', () => {
+    expect(CAMPAIGN_LEVELS.map((level) => level.campaign?.startingAssists)).toEqual([
+      { undo: 2, hint: 2 },
+      { undo: 2, hint: 2 },
+      { undo: 2, hint: 2 },
+      { undo: 2, hint: 2 },
+      { undo: 2, hint: 2 },
+      { undo: 2, hint: 1 },
+      { undo: 2, hint: 1 },
+      { undo: 2, hint: 1 },
+      { undo: 2, hint: 1 },
+      { undo: 2, hint: 1 },
+      { undo: 2, hint: 1 },
+      { undo: 2, hint: 1 },
+      { undo: 2, hint: 1 },
+      { undo: 2, hint: 1 },
+      { undo: 1, hint: 1 },
+      { undo: 1, hint: 1 },
+      { undo: 1, hint: 1 },
+      { undo: 1, hint: 1 },
+      { undo: 1, hint: 1 },
+      { undo: 1, hint: 1 },
+    ])
   })
 
   it('supports a full winning solution path on the default easy level', () => {
