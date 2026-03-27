@@ -3,6 +3,7 @@ import type { GameConfig, TileTheme, TileType } from './types'
 export const GAME_CONFIG: GameConfig = {
   matchCount: 3,
   trayCapacity: 7,
+  momentumChargeTarget: 3,
   boardWidth: 360,
   boardHeight: 520,
   tileWidth: 76,

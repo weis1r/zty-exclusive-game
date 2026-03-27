@@ -13,17 +13,23 @@ import gardenStickerPack from './assets/garden-sticker-pack.svg'
 import sparkRibbon from './assets/spark-ribbon.svg'
 import { GAME_CONFIG, TILE_THEMES } from './game/config'
 import {
+  areLevelGoalsComplete,
   canUseUndo,
+  canUseMomentumSkill,
   clearHint,
   clearResolvedMatches,
   createInitialGameState,
+  getClearedSpecialCount,
+  getEffectiveTrayCapacity,
   getHintSuggestion,
   getRemainingBoardTiles,
+  getRemovedTypeCount,
   isTileBlocked,
   pickTile,
   restartGame,
   startGame,
   useHint,
+  useMomentumSkill,
   useUndo,
 } from './game/engine'
 import {
@@ -50,6 +56,7 @@ import type {
   GameState,
   LevelDefinition,
   TileDefinition,
+  TileSpecialKind,
   TileTheme,
   TileType,
 } from './game/types'
@@ -77,6 +84,7 @@ type GameAction =
   | { type: 'clear-hint' }
   | { type: 'use-hint' }
   | { type: 'use-undo' }
+  | { type: 'use-momentum-skill' }
 
 interface GameAppProps {
   config?: GameConfig
@@ -94,6 +102,16 @@ interface CampaignChapterSummary {
   unlockedLevels: number
   completedLevels: number
   earnedStars: number
+}
+
+interface LevelGoalProgressView {
+  id: string
+  label: string
+  current: number
+  target: number
+  completed: boolean
+  accent: string
+  icon: string
 }
 
 interface ChapterAvatarTheme {
@@ -1452,9 +1470,11 @@ function createGameReducer(level: LevelDefinition, config: GameConfig) {
       case 'clear-hint':
         return clearHint(state)
       case 'use-hint':
-        return useHint(state, config)
+        return useHint(state, config, level)
       case 'use-undo':
         return useUndo(state)
+      case 'use-momentum-skill':
+        return useMomentumSkill(state, config)
       default:
         return state
     }
@@ -1565,6 +1585,80 @@ function getChapterThemeStyle(theme: ChapterAvatarTheme) {
   } as CSSProperties
 }
 
+function getSpecialBadge(kind: TileSpecialKind) {
+  switch (kind) {
+    case 'crate':
+      return '✦'
+    case 'companion':
+      return '♥'
+    case 'wild':
+      return '∞'
+  }
+}
+
+function getSpecialLabel(kind: TileSpecialKind) {
+  switch (kind) {
+    case 'crate':
+      return '礼盒砖'
+    case 'companion':
+      return '伙伴砖'
+    case 'wild':
+      return '万能砖'
+  }
+}
+
+function getLevelGoalProgress(level: LevelDefinition, state: GameState): LevelGoalProgressView[] {
+  if (!level.goals || level.goals.length === 0) {
+    const remainingCount = getRemainingBoardTiles(state).length
+    const clearedCount = level.tiles.length - remainingCount
+
+    return [
+      {
+        id: 'clear-board',
+        label: '清空整个棋盘',
+        current: clearedCount,
+        target: level.tiles.length,
+        completed: remainingCount === 0,
+        accent: '#ff9d58',
+        icon: '◎',
+      },
+    ]
+  }
+
+  return level.goals.map((goal) => {
+    if (goal.kind === 'collect-type') {
+      const current = getRemovedTypeCount(state, goal.tileType)
+
+      return {
+        id: goal.id,
+        label: goal.label,
+        current,
+        target: goal.target,
+        completed: current >= goal.target,
+        accent: TILE_THEMES[goal.tileType].main,
+        icon: TILE_THEMES[goal.tileType].badge,
+      }
+    }
+
+    const current = getClearedSpecialCount(state, goal.specialKind)
+
+    return {
+      id: goal.id,
+      label: goal.label,
+      current,
+      target: goal.target,
+      completed: current >= goal.target,
+      accent:
+        goal.specialKind === 'crate'
+          ? '#ffb158'
+          : goal.specialKind === 'companion'
+            ? '#ff6fa7'
+            : '#7c8cff',
+      icon: getSpecialBadge(goal.specialKind),
+    }
+  })
+}
+
 export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppProps) {
   const campaignLevels = campaign.levels
   const fallbackLevel = campaignLevels[0] ?? DEFAULT_LEVEL
@@ -1628,6 +1722,10 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
           : `已解锁下一关：${nextLevel.name}`
         : '战役通关完成'
       : null
+  const levelGoalProgress = getLevelGoalProgress(currentLevel, state)
+  const completedGoalCount = levelGoalProgress.filter((goal) => goal.completed).length
+  const effectiveTrayCapacity = getEffectiveTrayCapacity(state, config)
+  const canUseMomentumButton = canUseMomentumSkill(state, config)
 
   useEffect(() => {
     savePreferences({ soundEnabled })
@@ -1711,8 +1809,18 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
         trayCapacity: config.trayCapacity,
         trayTiles: state.trayTiles.map((trayTile) => trayTile.type),
         assistCharges: state.assistCharges,
+        momentumCharge: state.momentumCharge,
+        momentumTarget: config.momentumChargeTarget,
+        effectiveTrayCapacity,
         lastHintTileId: state.lastHintTileId,
         remainingCount: getRemainingBoardTiles(state).length,
+        goals: levelGoalProgress.map((goal) => ({
+          id: goal.id,
+          label: goal.label,
+          current: goal.current,
+          target: goal.target,
+          completed: goal.completed,
+        })),
         exposedTiles: getRemainingBoardTiles(state)
           .filter((tile) => !isTileBlocked(tile.id, state, config))
           .map((tile) => ({
@@ -1721,6 +1829,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
             x: tile.x,
             y: tile.y,
             layer: tile.layer,
+            special: tile.special?.kind ?? null,
         })),
       })
     }
@@ -1738,6 +1847,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     currentLevel.difficulty,
     currentLevel.id,
     currentLevel.name,
+    effectiveTrayCapacity,
+    levelGoalProgress,
     selectedLevelId,
     state,
     totalStars,
@@ -1820,7 +1931,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   )
   const isResolvingMatch = state.matchBursts.length > 0
   const remainingCount = activeBoardTiles.length
-  const hintSuggestion = getHintSuggestion(state, config)
+  const hintSuggestion = getHintSuggestion(state, config, currentLevel)
   const canUseHintButton =
     state.status === 'playing' &&
     state.assistCharges.hint > 0 &&
@@ -1889,6 +2000,14 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
       undoUsed: currentUsage.undoUsed + 1,
     }))
     dispatch({ type: 'use-undo' })
+  }
+
+  function handleUseMomentumSkill() {
+    if (!canUseMomentumButton) {
+      return
+    }
+
+    dispatch({ type: 'use-momentum-skill' })
   }
 
   function handleResetProgress() {
@@ -2256,6 +2375,39 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
               </div>
             </div>
 
+            <section className="goal-panel" data-testid="level-goals">
+              <div className="goal-panel__header">
+                <div>
+                  <p className="eyebrow">本关目标</p>
+                  <h2>先完成任务，再决定要不要清全盘</h2>
+                </div>
+                <p className="goal-panel__tip">
+                  {areLevelGoalsComplete(state, currentLevel)
+                    ? '目标已经全部完成，随时都能收下这一关。'
+                    : '这一章开始，每关都有更明确的任务目标。'}
+                </p>
+              </div>
+              <div className="goal-panel__grid">
+                {levelGoalProgress.map((goal) => (
+                  <article
+                    key={goal.id}
+                    className={`goal-card${goal.completed ? ' goal-card--done' : ''}`}
+                    style={{ '--goal-accent': goal.accent } as CSSProperties}
+                  >
+                    <span className="goal-card__icon" aria-hidden="true">
+                      {goal.icon}
+                    </span>
+                    <div>
+                      <strong>{goal.label}</strong>
+                      <span>
+                        {Math.min(goal.current, goal.target)}/{goal.target}
+                      </span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+
             <div className="status-strip status-strip--compact">
               <div className="status-chip status-chip--accent">
                 <span className="status-label">关卡</span>
@@ -2271,6 +2423,12 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 <span className="status-label">已选</span>
                 <strong data-testid="selected-count">{state.selectedCount} 次</strong>
               </div>
+              <div className="status-chip">
+                <span className="status-label">目标</span>
+                <strong>
+                  {completedGoalCount}/{levelGoalProgress.length}
+                </strong>
+              </div>
               <div className="status-chip status-chip--warning">
                 <span className="status-label">剩余</span>
                 <strong data-testid="remaining-count">{remainingCount} 块</strong>
@@ -2281,11 +2439,28 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
               <div className="toolbelt__header">
                 <div>
                   <p className="eyebrow">局内辅助</p>
-                  <h2>稳住节奏</h2>
+                  <h2>先做目标，再用节奏换扩槽</h2>
                 </div>
-                <p className="toolbelt__tip">
-                  {state.lastHintTileId ? '提示已标记一张推荐砖块。' : '提示只高亮，不会自动帮你点。'}
-                </p>
+                <div className="toolbelt__meta">
+                  <p className="toolbelt__tip">
+                    {state.lastHintTileId
+                      ? '提示已标记一张更接近目标的推荐砖块。'
+                      : '提示会优先指向目标砖或关键特殊砖。'}
+                  </p>
+                  <div className="charge-meter" data-testid="momentum-meter">
+                    <span className="charge-meter__label">充能</span>
+                    <div className="charge-meter__pips" aria-hidden="true">
+                      {Array.from({ length: config.momentumChargeTarget }, (_, index) => (
+                        <span
+                          key={`charge-${index}`}
+                          className={`charge-meter__pip${
+                            index < state.momentumCharge ? ' charge-meter__pip--filled' : ''
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="toolbelt__actions">
@@ -2318,6 +2493,17 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 >
                   <span className="tool-button__icon">图</span>
                   <span className="tool-button__label">回到花园地图</span>
+                </button>
+                <button
+                  type="button"
+                  className="tool-button tool-button--charge"
+                  data-testid="momentum-button"
+                  disabled={!canUseMomentumButton}
+                  onClick={handleUseMomentumSkill}
+                >
+                  <span className="tool-button__icon">槽</span>
+                  <span className="tool-button__label">扩槽</span>
+                  <span className="tool-button__count">+{state.bonusTrayCapacity}</span>
                 </button>
               </div>
             </section>
@@ -2354,7 +2540,11 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                       }`}
                       style={getTileStyle(tile)}
                       onClick={() => dispatch({ type: 'pick', tileId: tile.id })}
-                      aria-label={theme.title}
+                      aria-label={
+                        tile.special
+                          ? `${theme.title} · ${getSpecialLabel(tile.special.kind)}`
+                          : theme.title
+                      }
                       data-testid={`tile-${tile.id}`}
                       disabled={blocked || isResolvingMatch || state.status !== 'playing'}
                     >
@@ -2367,6 +2557,15 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                           theme={theme}
                           mood={blocked ? 'board-blocked' : hinted ? 'board-hinted' : 'board-active'}
                         />
+                        {tile.special ? (
+                          <span
+                            className={`tile-card__special tile-card__special--${tile.special.kind}`}
+                            aria-hidden="true"
+                            title={getSpecialLabel(tile.special.kind)}
+                          >
+                            {getSpecialBadge(tile.special.kind)}
+                          </span>
+                        ) : null}
                       </span>
                     </button>
                   )
@@ -2379,11 +2578,15 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 <div>
                   <p className="eyebrow">收集槽</p>
                   <h2>
-                    {state.trayTiles.length}/{config.trayCapacity}
+                    {state.trayTiles.length}/{effectiveTrayCapacity}
                   </h2>
                 </div>
                 <p className="tray-tip">
-                  {isResolvingMatch ? '正在结算三消...' : '同类砖块会自动相邻整理'}
+                  {isResolvingMatch
+                    ? '正在结算三消...'
+                    : state.bonusTrayCapacity > 0
+                      ? `本局已解锁 +${state.bonusTrayCapacity} 个额外槽位`
+                      : '同类砖块会自动相邻整理'}
                 </p>
               </div>
 
@@ -2391,10 +2594,10 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 className="tray-grid"
                 data-testid="tray-grid"
                 style={{
-                  gridTemplateColumns: `repeat(${config.trayCapacity}, minmax(0, 1fr))`,
+                  gridTemplateColumns: `repeat(${effectiveTrayCapacity}, minmax(0, 1fr))`,
                 }}
               >
-                {Array.from({ length: config.trayCapacity }, (_, slotIndex) => {
+                {Array.from({ length: effectiveTrayCapacity }, (_, slotIndex) => {
                   const trayTile = state.trayTiles[slotIndex]
 
                   return (
@@ -2418,6 +2621,14 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                             badge={TILE_THEMES[trayTile.type].badge}
                             className="tray-tile__badge"
                           />
+                          {trayTile.specialKind ? (
+                            <span
+                              className={`tray-tile__special tray-tile__special--${trayTile.specialKind}`}
+                              aria-hidden="true"
+                            >
+                              {getSpecialBadge(trayTile.specialKind)}
+                            </span>
+                          ) : null}
                           <TileMascot
                             tileType={trayTile.type}
                             theme={TILE_THEMES[trayTile.type]}
@@ -2508,6 +2719,9 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                   ) : null}
                   <div className="result-modal__stars">{getStarText(currentStars)}</div>
                   <div className="result-modal__reward">
+                    <span>
+                      目标完成 {completedGoalCount}/{levelGoalProgress.length}
+                    </span>
                     <span>本章累计 {selectedChapterSummary?.earnedStars ?? 0} 星</span>
                     <span>
                       最佳步数 {currentLevelRecord?.bestSelectedCount ?? state.selectedCount}

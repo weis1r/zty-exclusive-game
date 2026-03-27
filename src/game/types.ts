@@ -9,12 +9,35 @@ export type TileType =
   | 'pine'
   | 'wave'
 
+export type TileSpecialKind = 'crate' | 'companion' | 'wild'
+
+export interface TileSpecialDefinition {
+  kind: TileSpecialKind
+}
+
+export type LevelObjectiveDefinition =
+  | {
+      id: string
+      kind: 'collect-type'
+      tileType: TileType
+      target: number
+      label: string
+    }
+  | {
+      id: string
+      kind: 'clear-special'
+      specialKind: Exclude<TileSpecialKind, 'wild'>
+      target: number
+      label: string
+    }
+
 export interface TileDefinition {
   id: string
   type: TileType
   x: number
   y: number
   layer: number
+  special?: TileSpecialDefinition
 }
 
 export interface AssistCharges {
@@ -53,6 +76,7 @@ export interface LevelDefinition {
   difficulty?: 'easy' | 'normal' | 'hard'
   campaign?: CampaignLevelMeta
   tiles: TileDefinition[]
+  goals?: LevelObjectiveDefinition[]
 }
 
 export interface BoardTileState extends TileDefinition {
@@ -63,6 +87,7 @@ export interface TrayTile {
   entryId: string
   sourceTileId: string
   type: TileType
+  specialKind?: TileSpecialKind | null
 }
 
 export interface MatchBurst {
@@ -82,6 +107,9 @@ export interface GameStateSnapshot {
   resolvedMatchIds: string[]
   matchBursts: MatchBurst[]
   lastHintTileId: string | null
+  bonusTrayCapacity: number
+  momentumCharge: number
+  clearedSpecialCounts: Record<TileSpecialKind, number>
 }
 
 export interface GameState {
@@ -96,6 +124,9 @@ export interface GameState {
   assistCharges: AssistCharges
   lastHintTileId: string | null
   history: GameStateSnapshot[]
+  bonusTrayCapacity: number
+  momentumCharge: number
+  clearedSpecialCounts: Record<TileSpecialKind, number>
 }
 
 export type HintReason = 'ready-match' | 'tray-setup' | 'open-layer'
@@ -169,6 +200,7 @@ export interface TileTheme {
 export interface GameConfig {
   matchCount: number
   trayCapacity: number
+  momentumChargeTarget: number
   boardWidth: number
   boardHeight: number
   tileWidth: number

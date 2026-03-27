@@ -414,3 +414,77 @@ Verification
 - 浏览器实测：
   - 首页已显示 `20` 关、`5` 个章节。
   - 第 1 关进入后顶层不再是双三连白送，而是 `焰 x3 + 叶 x2 + 花 x1` 的较温和开局。
+
+---
+
+Task
+- 用户新需求: 直接开始把第 1 章前 3 关重做成新的任务制骨架，完成后推送远程分支，并接上自动化部署。
+
+What changed
+- `src/game/types.ts` / `src/game/config.ts` / `src/game/engine.ts`
+  - 新增任务制骨架所需的 UI-only / engine 字段：
+    - 特殊砖 `crate / companion / wild`
+    - 关卡目标 `collect-type / clear-special`
+    - 充能与扩槽：`momentumCharge` / `bonusTrayCapacity`
+  - 引擎支持：
+    - 礼盒砖点击即清，不进入收集槽
+    - 伙伴砖与礼盒砖可进入目标统计
+    - 万能砖按当前收集槽最有利类型自适应
+    - 三消后累积充能，可触发一次局内扩槽
+    - 通关判定从“清完整盘”扩展为“完成本关目标”
+- `src/game/levels.ts`
+  - 第 1 章前 3 关改成明确目标局：
+    - `thorn-garden-01`: 收集花牌 + 拆礼盒
+    - `lantern-steps-02`: 救伙伴 + 回收铃牌
+    - `ivy-arcade-03`: 伙伴目标 + 万能砖 + 扩槽节奏
+  - 保留后续 17 关原有章节结构，确保本轮只重做第 1 章前段。
+- `src/App.tsx` / `src/App.css`
+  - 局内增加目标面板、充能条、扩槽按钮、特殊砖角标与结算目标摘要。
+  - `render_game_to_text` 现在会输出 goals、momentum、effectiveTrayCapacity 和 exposed special tile 信息，方便自动化试玩。
+- `src/game/engine.test.ts`
+  - 把旧的“必须清完整盘才算赢”回归测试改成“完成目标即可赢”。
+  - 新增新骨架回归测试：
+    - 礼盒砖即时清除
+    - 万能砖自适应收集槽类型
+    - 充能扩槽技能
+    - 全 20 关仍然都可求解
+- `.github/workflows/deploy-cloudbase.yml`
+  - 新增 CloudBase 自动部署工作流。
+  - 对 `main` 和 `codex/app-ch1-redesign` 的 push 自动执行 `npm ci`、`npm run build` 并发布到 CloudBase 静态托管。
+
+Verification
+- 自动化检查：
+  - `npm run test -- --run`
+  - `npm run lint`
+  - `npm run build`
+- 结果：
+  - 3 个测试文件、28 个测试全部通过。
+  - lint / build 全通过。
+- 求解验证：
+  - 前 3 关任务制关卡均能被搜索求解：
+    - `thorn-garden-01`: 23 步
+    - `lantern-steps-02`: 15 步
+    - `ivy-arcade-03`: 30 步
+- 试玩与截图：
+  - 技能脚本产物：
+    - `output/web-game/ch1-redesign-20260327/shot-0.png`
+    - `output/web-game/ch1-redesign-20260327/state-0.json`
+    - `output/web-game/ch1-redesign-20260327/state-1.json`
+    - `output/web-game/ch1-redesign-20260327/state-2.json`
+  - 浏览器实测：
+    - 第 1 关已显示任务面板“收集花牌 + 拆礼盒”。
+    - 使用提示后，提示次数正常扣减且会优先指向目标砖。
+    - 按求解路径通关后，结果弹窗正确显示 `目标完成 2/2`，并解锁第 2 关。
+    - 第 2 关已切换到“救伙伴 + 回收铃牌”的新目标骨架。
+
+Deployment setup
+- 已在 GitHub 仓库配置 CloudBase Actions secrets：
+  - `CLOUDBASE_AUTH_JSON`
+  - `CLOUDBASE_CONFIG_JSON`
+  - `CLOUDBASE_ENV_ID`
+- 当前目标环境：
+  - `zty-game-5g8dxrld0e320cd1`
+
+Open notes
+- CloudBase 这套 workflow 会把当前分支或 `main` 发布到同一个静态托管环境，因此谁最后 push，线上就会以谁的构建为准。
+- 静态托管中的旧 hashed 资源文件会保留，但入口 `index.html` 会指向最新构建产物，不影响实际访问版本。

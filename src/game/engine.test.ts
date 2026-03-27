@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { GAME_CONFIG } from './config'
 import {
+  areLevelGoalsComplete,
+  canUseMomentumSkill,
   canUseUndo,
   clearResolvedMatches,
   createInitialGameState,
+  getEffectiveTrayCapacity,
   getRemainingBoardTiles,
   getHintSuggestion,
   insertIntoTray,
@@ -11,6 +14,7 @@ import {
   pickTile,
   restartGame,
   useHint,
+  useMomentumSkill,
   useUndo,
 } from './engine'
 import { CAMPAIGN, CAMPAIGN_LEVELS, DEFAULT_LEVEL, getCampaignChapters } from './levels'
@@ -32,7 +36,13 @@ function serializeState(level: LevelDefinition, state: ReturnType<typeof createI
     .map((tile) => tile.id)
     .join(',')
 
-  return `${removedTiles}|${state.trayTiles.map((tile) => tile.type).join(',')}|${state.status}`
+  return [
+    removedTiles,
+    state.trayTiles.map((tile) => tile.type).join(','),
+    `${state.clearedSpecialCounts.crate}-${state.clearedSpecialCounts.companion}-${state.clearedSpecialCounts.wild}`,
+    `${state.bonusTrayCapacity}-${state.momentumCharge}`,
+    state.status,
+  ].join('|')
 }
 
 function getExposedTilesByPriority(
@@ -248,6 +258,71 @@ describe('game engine', () => {
     expect(hintedState.assistCharges.hint).toBe(state.assistCharges.hint - 1)
   })
 
+  it('clears crate tiles instantly and can complete special-goal levels without entering the tray', () => {
+    const level: LevelDefinition = {
+      ...createLevel([{ id: 'crate-ember', type: 'ember', x: 0, y: 0, layer: 0, special: { kind: 'crate' } }]),
+      goals: [
+        {
+          id: 'goal-crate',
+          kind: 'clear-special',
+          specialKind: 'crate',
+          target: 1,
+          label: '拆开 1 个礼盒砖',
+        },
+      ],
+    }
+
+    const state = pickTile(
+      createInitialGameState(level, 'playing'),
+      'crate-ember',
+      level,
+      GAME_CONFIG,
+    )
+
+    expect(state.trayTiles).toHaveLength(0)
+    expect(state.clearedSpecialCounts.crate).toBe(1)
+    expect(state.status).toBe('won')
+  })
+
+  it('resolves wild tiles into the most useful tray type', () => {
+    const level = createLevel([
+      { id: 'leaf-1', type: 'leaf', x: 0, y: 0, layer: 0 },
+      { id: 'wild-ember', type: 'ember', x: 80, y: 0, layer: 0, special: { kind: 'wild' } },
+      { id: 'bell-1', type: 'bell', x: 160, y: 0, layer: 0 },
+    ])
+
+    let state = createInitialGameState(level, 'playing')
+    state = pickTile(state, 'leaf-1', level, GAME_CONFIG)
+    state = pickTile(state, 'wild-ember', level, GAME_CONFIG)
+
+    expect(state.trayTiles.map((tile) => tile.type)).toEqual(['leaf', 'leaf'])
+    expect(state.trayTiles.at(-1)?.specialKind).toBe('wild')
+    expect(state.clearedSpecialCounts.wild).toBe(1)
+  })
+
+  it('fills momentum on matches and expands tray capacity when the charge skill is used', () => {
+    const level = createLevel([
+      { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
+      { id: 'ember-2', type: 'ember', x: 80, y: 0, layer: 0 },
+      { id: 'ember-3', type: 'ember', x: 160, y: 0, layer: 0 },
+      { id: 'leaf-1', type: 'leaf', x: 240, y: 0, layer: 0 },
+    ])
+
+    let state = createInitialGameState(level, 'playing')
+    state = pickTile(state, 'ember-1', level, GAME_CONFIG)
+    state = pickTile(state, 'ember-2', level, GAME_CONFIG)
+    state = pickTile(state, 'ember-3', level, GAME_CONFIG)
+    state = clearResolvedMatches(state)
+
+    expect(state.momentumCharge).toBe(GAME_CONFIG.momentumChargeTarget)
+    expect(canUseMomentumSkill(state, GAME_CONFIG)).toBe(true)
+
+    const boostedState = useMomentumSkill(state, GAME_CONFIG)
+
+    expect(boostedState.momentumCharge).toBe(0)
+    expect(getEffectiveTrayCapacity(boostedState, GAME_CONFIG)).toBe(GAME_CONFIG.trayCapacity + 1)
+  })
+
   it('restores the previous snapshot when undo is used', () => {
     const level = createLevel([
       { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
@@ -367,7 +442,7 @@ describe('game engine', () => {
     const winningPath = findWinningPath(DEFAULT_LEVEL)
 
     expect(winningPath).not.toBeNull()
-    expect(winningPath).toHaveLength(DEFAULT_LEVEL.tiles.length)
+    expect(winningPath!.length).toBeGreaterThan(0)
 
     let state = createInitialGameState(DEFAULT_LEVEL, 'playing')
 
@@ -381,14 +456,29 @@ describe('game engine', () => {
 
     expect(state.status).toBe('won')
     expect(state.trayTiles).toHaveLength(0)
-    expect(state.boardTiles.every((tile) => tile.removed)).toBe(true)
+    expect(areLevelGoalsComplete(state, DEFAULT_LEVEL)).toBe(true)
+    expect(state.boardTiles.some((tile) => !tile.removed)).toBe(true)
   })
 
   it('keeps every shipped campaign level solvable', () => {
     const unsolvedLevels = CAMPAIGN_LEVELS.flatMap((level) => {
       const winningPath = findWinningPath(level)
 
-      if (!winningPath || winningPath.length !== level.tiles.length) {
+      if (!winningPath || winningPath.length === 0) {
+        return [level.id]
+      }
+
+      let state = createInitialGameState(level, 'playing')
+
+      for (const tileId of winningPath) {
+        state = pickTile(state, tileId, level, GAME_CONFIG)
+
+        if (state.matchBursts.length > 0) {
+          state = clearResolvedMatches(state)
+        }
+      }
+
+      if (state.status !== 'won' || !areLevelGoalsComplete(state, level)) {
         return [level.id]
       }
 

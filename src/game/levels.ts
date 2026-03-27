@@ -2,8 +2,10 @@ import type {
   AssistCharges,
   CampaignChapterDefinition,
   CampaignDefinition,
+  LevelObjectiveDefinition,
   LevelDefinition,
   TileDefinition,
+  TileSpecialKind,
   TileType,
 } from './types'
 
@@ -33,6 +35,11 @@ interface ChapterBlueprint {
 type LevelLayoutId = 'stack36' | 'stair27'
 type TileCountSpec = readonly [TileType, number]
 
+interface TileSpecialPlacement {
+  slotIndex: number
+  kind: TileSpecialKind
+}
+
 interface LevelBlueprint {
   id: string
   name: string
@@ -47,14 +54,23 @@ interface LevelBlueprint {
   counts: TileCountSpec[]
   opening: TileType[]
   filler: TileType[]
+  goals?: LevelObjectiveDefinition[]
+  specials?: TileSpecialPlacement[]
 }
 
-function createTiles(slots: TileSlot[], types: TileType[]): TileDefinition[] {
+function createTiles(
+  slots: TileSlot[],
+  types: TileType[],
+  specials: TileSpecialPlacement[] = [],
+): TileDefinition[] {
   if (slots.length !== types.length) {
     throw new Error(`Tile slot count ${slots.length} does not match type count ${types.length}`)
   }
 
   const typeCounts = new Map<TileType, number>()
+  const specialBySlotIndex = new Map(
+    specials.map((special) => [special.slotIndex, special] as const),
+  )
 
   return slots.map((slot, index) => {
     const type = types[index]
@@ -67,6 +83,9 @@ function createTiles(slots: TileSlot[], types: TileType[]): TileDefinition[] {
       x: slot.x,
       y: slot.y,
       layer: slot.layer,
+      special: specialBySlotIndex.get(index)
+        ? { kind: specialBySlotIndex.get(index)!.kind }
+        : undefined,
     }
   })
 }
@@ -273,9 +292,9 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
     difficulty: 'easy',
     chapterId: 'chapter-bloom-path',
     order: 1,
-    summary: '起手只有一组三连，先从“看见能消”和“保留对子”开始。',
-    recommendedSelectionCount: 42,
-    starSelectionThresholds: [37, 44, 52],
+    summary: '不再要求清空整盘，先学会一边拆礼盒，一边收集目标头像。',
+    recommendedSelectionCount: 30,
+    starSelectionThresholds: [26, 32, 38],
     startingAssists: { undo: 2, hint: 2 },
     counts: [
       ['ember', 9],
@@ -285,6 +304,26 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
     ],
     opening: ['ember', 'leaf', 'ember', 'bloom', 'ember', 'leaf'],
     filler: ['bell', 'leaf', 'bloom', 'ember', 'bell', 'leaf', 'bloom', 'ember'],
+    goals: [
+      {
+        id: 'goal-bloom-collect',
+        kind: 'collect-type',
+        tileType: 'bloom',
+        target: 6,
+        label: '收集 6 张花牌',
+      },
+      {
+        id: 'goal-crate-open',
+        kind: 'clear-special',
+        specialKind: 'crate',
+        target: 2,
+        label: '拆开 2 个礼盒砖',
+      },
+    ],
+    specials: [
+      { slotIndex: 1, kind: 'crate' },
+      { slotIndex: 4, kind: 'crate' },
+    ],
   },
   {
     id: 'lantern-steps-02',
@@ -293,9 +332,9 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
     difficulty: 'easy',
     chapterId: 'chapter-bloom-path',
     order: 2,
-    summary: '顶层能看见一组三连，但剩下的要靠你自己整理出第二波。',
-    recommendedSelectionCount: 32,
-    starSelectionThresholds: [29, 35, 41],
+    summary: '这一关开始要救出被困住的伙伴砖，不是只顾着消最快的那一组。',
+    recommendedSelectionCount: 26,
+    starSelectionThresholds: [22, 28, 34],
     startingAssists: { undo: 2, hint: 2 },
     counts: [
       ['ember', 6],
@@ -305,6 +344,27 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
     ],
     opening: ['ember', 'leaf', 'bell', 'bloom', 'ember', 'bell', 'leaf', 'bloom', 'bell'],
     filler: ['ember', 'leaf', 'bloom', 'bell', 'bell', 'ember', 'leaf', 'bloom'],
+    goals: [
+      {
+        id: 'goal-companion-save',
+        kind: 'clear-special',
+        specialKind: 'companion',
+        target: 3,
+        label: '救出 3 个花园伙伴',
+      },
+      {
+        id: 'goal-bell-collect',
+        kind: 'collect-type',
+        tileType: 'bell',
+        target: 6,
+        label: '回收 6 张铃牌',
+      },
+    ],
+    specials: [
+      { slotIndex: 1, kind: 'companion' },
+      { slotIndex: 4, kind: 'companion' },
+      { slotIndex: 7, kind: 'companion' },
+    ],
   },
   {
     id: 'ivy-arcade-03',
@@ -313,9 +373,9 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
     difficulty: 'normal',
     chapterId: 'chapter-bloom-path',
     order: 3,
-    summary: '章末第一次把五类头像放到同一盘里，得先判断哪一种更值得先腾槽。',
-    recommendedSelectionCount: 45,
-    starSelectionThresholds: [40, 47, 55],
+    summary: '章末把万能砖和扩槽节奏一起交给你，开始像解一场小型任务局。',
+    recommendedSelectionCount: 34,
+    starSelectionThresholds: [30, 36, 43],
     startingAssists: { undo: 2, hint: 2 },
     counts: [
       ['bloom', 9],
@@ -326,6 +386,28 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
     ],
     opening: ['bloom', 'cloud', 'leaf', 'bell', 'bloom', 'ember'],
     filler: ['cloud', 'leaf', 'ember', 'bell', 'bloom', 'ember', 'cloud', 'leaf', 'bell'],
+    goals: [
+      {
+        id: 'goal-companion-finale',
+        kind: 'clear-special',
+        specialKind: 'companion',
+        target: 2,
+        label: '护送 2 个领队头像',
+      },
+      {
+        id: 'goal-ember-finale',
+        kind: 'collect-type',
+        tileType: 'ember',
+        target: 6,
+        label: '收集 6 张焰牌',
+      },
+    ],
+    specials: [
+      { slotIndex: 1, kind: 'companion' },
+      { slotIndex: 4, kind: 'wild' },
+      { slotIndex: 5, kind: 'companion' },
+      { slotIndex: 8, kind: 'crate' },
+    ],
   },
   {
     id: 'mirror-court-04',
@@ -722,9 +804,11 @@ function createCampaignLevels(): LevelDefinition[] {
         starSelectionThresholds: blueprint.starSelectionThresholds,
         startingAssists: blueprint.startingAssists,
       },
+      goals: blueprint.goals,
       tiles: createTiles(
         layout.slots,
         buildLevelTypes(layout, blueprint.counts, blueprint.opening, blueprint.filler),
+        blueprint.specials,
       ),
     }
   })

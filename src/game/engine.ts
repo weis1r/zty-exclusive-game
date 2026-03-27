@@ -8,6 +8,7 @@ import type {
   HintSuggestion,
   LevelDefinition,
   MatchBurst,
+  TileSpecialKind,
   TileDefinition,
   TileType,
   TrayTile,
@@ -32,6 +33,14 @@ function cloneMatchBursts(matchBursts: MatchBurst[]): MatchBurst[] {
   return matchBursts.map((burst) => ({ ...burst }))
 }
 
+function createClearedSpecialCounts(): Record<TileSpecialKind, number> {
+  return {
+    crate: 0,
+    companion: 0,
+    wild: 0,
+  }
+}
+
 function overlaps(topTile: TileDefinition, bottomTile: TileDefinition, config: GameConfig) {
   return (
     Math.abs(topTile.x - bottomTile.x) < config.blockerOverlapX &&
@@ -39,11 +48,16 @@ function overlaps(topTile: TileDefinition, bottomTile: TileDefinition, config: G
   )
 }
 
-function createTrayEntry(tile: TileDefinition, selectionNumber: number): TrayTile {
+function createTrayEntry(
+  tile: TileDefinition,
+  selectionNumber: number,
+  resolvedType: TileType = tile.type,
+): TrayTile {
   return {
     entryId: `${tile.id}-${selectionNumber}`,
     sourceTileId: tile.id,
-    type: tile.type,
+    type: resolvedType,
+    specialKind: tile.special?.kind ?? null,
   }
 }
 
@@ -107,6 +121,9 @@ function createSnapshot(state: GameState): GameStateSnapshot {
     resolvedMatchIds: [...state.resolvedMatchIds],
     matchBursts: cloneMatchBursts(state.matchBursts),
     lastHintTileId: state.lastHintTileId,
+    bonusTrayCapacity: state.bonusTrayCapacity,
+    momentumCharge: state.momentumCharge,
+    clearedSpecialCounts: { ...state.clearedSpecialCounts },
   }
 }
 
@@ -123,6 +140,68 @@ function getTrayTypeCounts(trayTiles: TrayTile[]) {
   })
 
   return counts
+}
+
+function resolveWildType(state: GameState, level: LevelDefinition, fallbackType: TileType): TileType {
+  const trayTypeCounts = getTrayTypeCounts(state.trayTiles)
+  let bestType: TileType | null = null
+  let bestCount = -1
+
+  trayTypeCounts.forEach((count, type) => {
+    if (count > bestCount) {
+      bestType = type
+      bestCount = count
+    }
+  })
+
+  if (bestType) {
+    return bestType
+  }
+
+  const objectiveType = level.goals?.find((goal) => goal.kind === 'collect-type')
+
+  if (objectiveType?.kind === 'collect-type') {
+    return objectiveType.tileType
+  }
+
+  return fallbackType
+}
+
+export function getRemovedTypeCount(state: GameState, tileType: TileType): number {
+  return state.boardTiles.filter((tile) => tile.removed && tile.type === tileType).length
+}
+
+export function getClearedSpecialCount(
+  state: GameState,
+  specialKind: TileSpecialKind,
+): number {
+  return state.clearedSpecialCounts[specialKind] ?? 0
+}
+
+export function areLevelGoalsComplete(state: GameState, level: LevelDefinition): boolean {
+  if (!level.goals || level.goals.length === 0) {
+    return getRemainingBoardTiles(state).length === 0
+  }
+
+  return level.goals.every((goal) => {
+    if (goal.kind === 'collect-type') {
+      return getRemovedTypeCount(state, goal.tileType) >= goal.target
+    }
+
+    return getClearedSpecialCount(state, goal.specialKind) >= goal.target
+  })
+}
+
+export function getEffectiveTrayCapacity(state: GameState, config: GameConfig): number {
+  return config.trayCapacity + state.bonusTrayCapacity
+}
+
+export function canUseMomentumSkill(state: GameState, config: GameConfig): boolean {
+  return (
+    state.status === 'playing' &&
+    state.matchBursts.length === 0 &&
+    state.momentumCharge >= config.momentumChargeTarget
+  )
 }
 
 function getSortedExposedTiles(state: GameState, config: GameConfig): BoardTileState[] {
@@ -157,6 +236,9 @@ export function createInitialGameState(
     assistCharges: getStartingAssistCharges(level),
     lastHintTileId: null,
     history: [],
+    bonusTrayCapacity: 0,
+    momentumCharge: 0,
+    clearedSpecialCounts: createClearedSpecialCounts(),
   }
 }
 
@@ -263,6 +345,7 @@ export function useUndo(state: GameState): GameState {
 export function getHintSuggestion(
   state: GameState,
   config: GameConfig,
+  level?: LevelDefinition,
 ): HintSuggestion | null {
   if (state.status !== 'playing' || state.matchBursts.length > 0) {
     return null
@@ -272,6 +355,42 @@ export function getHintSuggestion(
 
   if (exposedTiles.length === 0) {
     return null
+  }
+
+  if (level?.goals?.length) {
+    for (const goal of level.goals) {
+      if (goal.kind === 'clear-special') {
+        const currentCount = getClearedSpecialCount(state, goal.specialKind)
+
+        if (currentCount < goal.target) {
+          const specialTile = exposedTiles.find((tile) => tile.special?.kind === goal.specialKind)
+
+          if (specialTile) {
+            return {
+              tileId: specialTile.id,
+              type: specialTile.type,
+              reason: 'open-layer',
+            }
+          }
+        }
+      }
+
+      if (goal.kind === 'collect-type') {
+        const currentCount = getRemovedTypeCount(state, goal.tileType)
+
+        if (currentCount < goal.target) {
+          const goalTile = exposedTiles.find((tile) => tile.type === goal.tileType)
+
+          if (goalTile) {
+            return {
+              tileId: goalTile.id,
+              type: goalTile.type,
+              reason: 'tray-setup',
+            }
+          }
+        }
+      }
+    }
   }
 
   const trayTypeCounts = getTrayTypeCounts(state.trayTiles)
@@ -333,7 +452,11 @@ export function getHintSuggestion(
   }
 }
 
-export function useHint(state: GameState, config: GameConfig): GameState {
+export function useHint(
+  state: GameState,
+  config: GameConfig,
+  level?: LevelDefinition,
+): GameState {
   if (
     state.status !== 'playing' ||
     state.matchBursts.length > 0 ||
@@ -342,7 +465,7 @@ export function useHint(state: GameState, config: GameConfig): GameState {
     return state
   }
 
-  const suggestion = getHintSuggestion(state, config)
+  const suggestion = getHintSuggestion(state, config, level)
 
   if (!suggestion) {
     return state
@@ -356,6 +479,35 @@ export function useHint(state: GameState, config: GameConfig): GameState {
     },
     lastHintTileId: suggestion.tileId,
   }
+}
+
+export function useMomentumSkill(state: GameState, config: GameConfig): GameState {
+  if (!canUseMomentumSkill(state, config)) {
+    return state
+  }
+
+  return {
+    ...state,
+    bonusTrayCapacity: state.bonusTrayCapacity + 1,
+    momentumCharge: 0,
+    lastHintTileId: null,
+  }
+}
+
+function resolveNextStatus(
+  nextState: GameState,
+  level: LevelDefinition,
+  config: GameConfig,
+): GameStatus {
+  if (areLevelGoalsComplete(nextState, level)) {
+    return 'won'
+  }
+
+  if (nextState.trayTiles.length >= getEffectiveTrayCapacity(nextState, config)) {
+    return 'lost'
+  }
+
+  return 'playing'
 }
 
 export function pickTile(
@@ -383,7 +535,43 @@ export function pickTile(
       : tile,
   )
   const nextSelectionCount = state.selectedCount + 1
-  const trayCandidate = createTrayEntry(targetTile, nextSelectionCount)
+  const nextClearedSpecialCounts = {
+    ...state.clearedSpecialCounts,
+    ...(targetTile.special?.kind
+      ? {
+          [targetTile.special.kind]:
+            (state.clearedSpecialCounts[targetTile.special.kind] ?? 0) + 1,
+        }
+      : {}),
+  }
+
+  if (targetTile.special?.kind === 'crate') {
+    const nextState: GameState = {
+      ...state,
+      levelId: level.id,
+      boardTiles: nextBoardTiles,
+      trayTiles: state.trayTiles,
+      selectedCount: nextSelectionCount,
+      removedCount: state.removedCount + 1,
+      resolvedMatchIds: [],
+      matchBursts: [],
+      lastHintTileId: null,
+      history: pushHistory(state),
+      momentumCharge: Math.min(state.momentumCharge + 1, config.momentumChargeTarget),
+      clearedSpecialCounts: nextClearedSpecialCounts,
+    }
+
+    return {
+      ...nextState,
+      status: resolveNextStatus(nextState, level, config),
+    }
+  }
+
+  const resolvedTrayType =
+    targetTile.special?.kind === 'wild'
+      ? resolveWildType(state, level, targetTile.type)
+      : targetTile.type
+  const trayCandidate = createTrayEntry(targetTile, nextSelectionCount, resolvedTrayType)
   const insertedTrayTiles = insertIntoTray(state.trayTiles, trayCandidate)
   const { nextTrayTiles, matchBursts } = resolveTrayMatches(
     insertedTrayTiles,
@@ -391,27 +579,29 @@ export function pickTile(
   )
 
   const nextResolvedMatchIds = matchBursts.map((burst) => burst.id)
-  const remainingBoardTileCount = nextBoardTiles.filter((tile) => !tile.removed).length
+  const nextMomentumCharge =
+    matchBursts.length > 0
+      ? Math.min(state.momentumCharge + matchBursts.length, config.momentumChargeTarget)
+      : state.momentumCharge
 
-  let nextStatus: GameStatus = 'playing'
-
-  if (remainingBoardTileCount === 0) {
-    nextStatus = 'won'
-  } else if (nextTrayTiles.length >= config.trayCapacity) {
-    nextStatus = 'lost'
-  }
-
-  return {
+  const nextState: GameState = {
     ...state,
     levelId: level.id,
     boardTiles: nextBoardTiles,
     trayTiles: nextTrayTiles,
-    status: nextStatus,
+    status: 'playing',
     selectedCount: nextSelectionCount,
     removedCount: state.removedCount + matchBursts.length,
     resolvedMatchIds: nextResolvedMatchIds,
     matchBursts,
     lastHintTileId: null,
     history: pushHistory(state),
+    momentumCharge: nextMomentumCharge,
+    clearedSpecialCounts: nextClearedSpecialCounts,
+  }
+
+  return {
+    ...nextState,
+    status: resolveNextStatus(nextState, level, config),
   }
 }
