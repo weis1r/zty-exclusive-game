@@ -31,6 +31,8 @@ jobs:
         run: npm ci
 
       - name: Build
+        env:
+          DEPLOY_TARGET: cloudbase
         run: npm run build
 
       - name: Restore CloudBase credentials

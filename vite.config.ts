@@ -4,9 +4,10 @@ import { defineConfig } from 'vitest/config'
 // https://vite.dev/config/
 export default defineConfig(({ command }) => {
   const repoName = process.env.GITHUB_REPOSITORY?.split('/')[1]
+  const deployTarget = process.env.DEPLOY_TARGET
   const isGitHubPagesBuild =
     command === 'build' &&
-    process.env.GITHUB_ACTIONS === 'true' &&
+    deployTarget === 'github-pages' &&
     typeof repoName === 'string' &&
     repoName.length > 0
 

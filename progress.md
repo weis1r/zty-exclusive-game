@@ -488,3 +488,4 @@ Deployment setup
 Open notes
 - CloudBase 这套 workflow 会把当前分支或 `main` 发布到同一个静态托管环境，因此谁最后 push，线上就会以谁的构建为准。
 - 静态托管中的旧 hashed 资源文件会保留，但入口 `index.html` 会指向最新构建产物，不影响实际访问版本。
+- 2026-03-27 补充：最初的 CloudBase Actions 构建错误复用了 GitHub Pages 的 base 路径，导致线上去请求 `/zty-exclusive-game/assets/*`。现已在 `vite.config.ts` 中改为通过 `DEPLOY_TARGET` 区分 Pages 与 CloudBase，两条 workflow 都已分别接上对应环境变量。
