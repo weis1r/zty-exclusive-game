@@ -37,12 +37,12 @@ jobs:
 
       - name: Restore CloudBase credentials
         env:
-          CLOUDBASE_AUTH_JSON: ${{ secrets.CLOUDBASE_AUTH_JSON }}
-          CLOUDBASE_CONFIG_JSON: ${{ secrets.CLOUDBASE_CONFIG_JSON }}
+          CLOUDBASE_AUTH_JSON_B64: ${{ secrets.CLOUDBASE_AUTH_JSON_B64 }}
+          CLOUDBASE_CONFIG_JSON_B64: ${{ secrets.CLOUDBASE_CONFIG_JSON_B64 }}
         run: |
           mkdir -p "$HOME/.config/.cloudbase"
-          printf '%s' "$CLOUDBASE_AUTH_JSON" > "$HOME/.config/.cloudbase/auth.json"
-          printf '%s' "$CLOUDBASE_CONFIG_JSON" > "$HOME/.config/.cloudbase/config.json"
+          printf '%s' "$CLOUDBASE_AUTH_JSON_B64" | base64 --decode > "$HOME/.config/.cloudbase/auth.json"
+          printf '%s' "$CLOUDBASE_CONFIG_JSON_B64" | base64 --decode > "$HOME/.config/.cloudbase/config.json"
 
       - name: Install CloudBase CLI
         run: npm install -g @cloudbase/cli

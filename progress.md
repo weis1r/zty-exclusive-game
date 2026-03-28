@@ -520,3 +520,4 @@ Verification
 Open notes
 - 这一轮优先解决的是“手机端能顺畅浏览和操作”，没有再单独为横屏设计专用布局。
 - 当前移动端仍保留完整局内信息，只是改成更紧凑的层级；如果下一轮还要继续压缩，可以考虑把部分状态信息收进可折叠摘要条。
+- CloudBase Actions 在 2026-03-28 一度因为 runner 里恢复多行 `auth.json` 失败而报 `No valid identity information`；现已把 workflow 改成从 base64 secret 解码恢复，线上也已手动补发当前移动端构建。
