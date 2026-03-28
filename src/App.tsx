@@ -2010,6 +2010,25 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     dispatch({ type: 'use-momentum-skill' })
   }
 
+  function focusChapter(chapterId: string) {
+    const chapterLevels = getLevelsForChapter(chapterId, campaign)
+
+    if (chapterLevels.length === 0) {
+      return
+    }
+
+    const currentProgressLevel = getCampaignLevelById(campaignProgress.currentLevelId, campaign)
+    const fallbackTarget =
+      chapterLevels.find((level) => campaignProgress.levelRecords[level.id]?.unlocked) ??
+      chapterLevels[0]
+    const nextTarget =
+      currentProgressLevel?.campaign?.chapterId === chapterId
+        ? currentProgressLevel
+        : fallbackTarget
+
+    setSelectedLevelId(nextTarget.id)
+  }
+
   function handleResetProgress() {
     if (!window.confirm('要清空战役进度和星级记录吗？')) {
       return
@@ -2129,13 +2148,16 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                   const chapterTheme = getChapterAvatarTheme(summary.chapter)
 
                   return (
-                    <article
+                    <button
                       key={summary.chapter.id}
+                      type="button"
                       className={`campaign-preview__card${
                         isActive ? ' campaign-preview__card--active' : ''
                       }`}
                       data-testid={`chapter-card-${summary.chapter.id}`}
                       style={getChapterThemeStyle(chapterTheme)}
+                      aria-pressed={isActive}
+                      onClick={() => focusChapter(summary.chapter.id)}
                     >
                       <img
                         src={chapterTheme.ribbon}
@@ -2162,7 +2184,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                       <span className="campaign-preview__stars">
                         {summary.completedLevels}/{summary.totalLevels} 关 · {summary.earnedStars} 星
                       </span>
-                    </article>
+                    </button>
                   )
                 })}
               </div>
@@ -2267,7 +2289,9 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 {chapterSections.map(({ summary, levels }) => (
                   <section
                     key={summary.chapter.id}
-                    className="chapter-section"
+                    className={`chapter-section${
+                      summary.chapter.id === selectedChapterId ? ' chapter-section--active' : ''
+                    }`}
                     data-testid={`chapter-section-${summary.chapter.id}`}
                   >
                     <div className="chapter-section__header">
