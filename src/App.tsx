@@ -2,12 +2,17 @@ import { startTransition, useEffect, useReducer, useRef, useState } from 'react'
 import './App.css'
 import { GAME_CONFIG } from './game/config'
 import {
+  advanceGameTime,
   clearHint,
   clearResolvedMatches,
   createInitialGameState,
+  getDisplayedTileType,
   getRemainingBoardTiles,
+  getTileCycleState,
   isTileBlocked,
+  moveTrayTileToPocket,
   pickTile,
+  releasePocketToTray,
   restartGame,
   startGame,
   useHint,
@@ -38,6 +43,9 @@ declare global {
 type GameAction =
   | { type: 'start-level'; level: LevelDefinition }
   | { type: 'pick'; tileId: string }
+  | { type: 'move-tray-to-pocket'; trayIndex: number }
+  | { type: 'release-pocket'; pocketIndex: number }
+  | { type: 'advance-time'; ms: number }
   | { type: 'restart' }
   | { type: 'clear-match-bursts' }
   | { type: 'clear-hint' }
@@ -61,6 +69,12 @@ function createGameReducer(level: LevelDefinition, config: GameConfig) {
         return startGame(action.level)
       case 'pick':
         return pickTile(state, action.tileId, level, config)
+      case 'move-tray-to-pocket':
+        return moveTrayTileToPocket(state, level, action.trayIndex)
+      case 'release-pocket':
+        return releasePocketToTray(state, level, action.pocketIndex, config)
+      case 'advance-time':
+        return advanceGameTime(state, action.ms)
       case 'restart':
         return restartGame(level)
       case 'clear-match-bursts':
@@ -68,7 +82,7 @@ function createGameReducer(level: LevelDefinition, config: GameConfig) {
       case 'clear-hint':
         return clearHint(state)
       case 'use-hint':
-        return useHint(state, config)
+        return useHint(state, level, config)
       case 'use-undo':
         return useUndo(state)
       default:
@@ -113,6 +127,9 @@ function buildRoundSummary(
     levelOrder: getLevelOrder(level),
     shapeId: level.campaign?.shapeId ?? null,
     shapeLabel: level.campaign?.shapeLabel ?? null,
+    tileCount: level.campaign?.tileCount ?? level.tiles.length,
+    chapterRuleId: level.campaign?.chapterRuleId ?? null,
+    chapterRuleLabel: level.campaign?.chapterRuleLabel ?? null,
     nextLevelId: nextLevel?.id ?? null,
     nextLevelOrder: nextLevel ? getLevelOrder(nextLevel) : null,
     selectedCount,
@@ -155,19 +172,29 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   }, [soundEnabled])
 
   useEffect(() => {
-    if (typeof window.advanceTime === 'function') {
-      return
+    window.advanceTime = async (ms: number) => {
+      dispatch({ type: 'advance-time', ms })
     }
-
-    window.advanceTime = (ms: number) =>
-      new Promise((resolve) => {
-        window.setTimeout(resolve, ms)
-      })
 
     return () => {
       delete window.advanceTime
     }
   }, [])
+
+  useEffect(() => {
+    if (screen !== 'game' || state.status !== 'playing') {
+      return
+    }
+
+    const tickMs = 250
+    const timer = window.setInterval(() => {
+      dispatch({ type: 'advance-time', ms: tickMs })
+    }, tickMs)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [screen, state.status])
 
   useEffect(() => {
     const renderGameToText = () => {
@@ -178,6 +205,9 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
           currentLevelOrder: getLevelOrder(homeLevel),
           currentShapeId: homeLevel.campaign?.shapeId ?? null,
           currentShapeLabel: homeLevel.campaign?.shapeLabel ?? null,
+          currentTileCount: homeLevel.campaign?.tileCount ?? homeLevel.tiles.length,
+          currentChapterRuleId: homeLevel.campaign?.chapterRuleId ?? null,
+          currentChapterRuleLabel: homeLevel.campaign?.chapterRuleLabel ?? null,
           totalLevels: campaignLevels.length,
           soundEnabled,
           settingsOpen,
@@ -198,19 +228,27 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
         levelOrder: getLevelOrder(currentLevel),
         shapeId: currentLevel.campaign?.shapeId ?? null,
         shapeLabel: currentLevel.campaign?.shapeLabel ?? null,
+        tileCount: currentLevel.campaign?.tileCount ?? currentLevel.tiles.length,
+        chapterRuleId: currentLevel.campaign?.chapterRuleId ?? null,
+        chapterRuleLabel: currentLevel.campaign?.chapterRuleLabel ?? null,
         status: state.status,
+        elapsedMs: state.elapsedMs,
         selectedCount: state.selectedCount,
         trayTiles: state.trayTiles.map((trayTile) => trayTile.type),
+        orbitPockets: state.orbitPockets.map((pocketTile) => pocketTile?.type ?? null),
         assistCharges: state.assistCharges,
         remainingCount: getRemainingBoardTiles(state).length,
         exposedTiles: getRemainingBoardTiles(state)
           .filter((tile) => !isTileBlocked(tile.id, state, config))
           .map((tile) => ({
             id: tile.id,
-            type: tile.type,
+            baseType: tile.type,
+            currentType: getDisplayedTileType(tile, currentLevel, state.elapsedMs),
             x: tile.x,
             y: tile.y,
             layer: tile.layer,
+            dynamicGroup: tile.dynamicGroup ?? null,
+            cycle: getTileCycleState(tile, state.elapsedMs),
           })),
       })
     }
@@ -445,6 +483,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
             state={state}
             onBack={handleBackFromGame}
             onPick={(tileId) => dispatch({ type: 'pick', tileId })}
+            onMoveTrayToPocket={(trayIndex) => dispatch({ type: 'move-tray-to-pocket', trayIndex })}
+            onReleasePocket={(pocketIndex) => dispatch({ type: 'release-pocket', pocketIndex })}
             onUseHint={handleUseHint}
             onUseUndo={handleUseUndo}
           />

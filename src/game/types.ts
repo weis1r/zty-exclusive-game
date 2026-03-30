@@ -9,18 +9,28 @@ export type TileType =
   | 'pine'
   | 'wave'
 
+export type DynamicTileGroup = 'shift-a' | 'shift-b'
+
 export interface TileDefinition {
   id: string
   type: TileType
   x: number
   y: number
   layer: number
+  dynamicGroup?: DynamicTileGroup
 }
 
 export interface AssistCharges {
   undo: number
   hint: number
 }
+
+export type ChapterRuleId =
+  | 'classic'
+  | 'single-pocket-tail'
+  | 'single-pocket-head-return'
+  | 'single-pocket-any'
+  | 'double-pocket-any'
 
 export interface CampaignLevelMeta {
   order: number
@@ -29,6 +39,9 @@ export interface CampaignLevelMeta {
   summary: string
   shapeId?: string
   shapeLabel?: string
+  tileCount?: number
+  chapterRuleId?: ChapterRuleId
+  chapterRuleLabel?: string
   unlocksLevelId?: string
   recommendedSelectionCount?: number
   // Thresholds are max picks for 3-star / 2-star / 1-star.
@@ -54,6 +67,7 @@ export interface LevelDefinition {
   boardHeight: number
   difficulty?: 'easy' | 'normal' | 'hard'
   campaign?: CampaignLevelMeta
+  typePool?: TileType[]
   tiles: TileDefinition[]
 }
 
@@ -67,6 +81,8 @@ export interface TrayTile {
   type: TileType
 }
 
+export type OrbitPocket = TrayTile | null
+
 export interface MatchBurst {
   id: string
   slotIndex: number
@@ -78,18 +94,21 @@ export type GameStatus = 'idle' | 'playing' | 'won' | 'lost'
 export interface GameStateSnapshot {
   boardTiles: BoardTileState[]
   trayTiles: TrayTile[]
+  orbitPockets: OrbitPocket[]
   status: GameStatus
   selectedCount: number
   removedCount: number
   resolvedMatchIds: string[]
   matchBursts: MatchBurst[]
   lastHintTileId: string | null
+  elapsedMs: number
 }
 
 export interface GameState {
   levelId: string
   boardTiles: BoardTileState[]
   trayTiles: TrayTile[]
+  orbitPockets: OrbitPocket[]
   status: GameStatus
   selectedCount: number
   removedCount: number
@@ -97,6 +116,7 @@ export interface GameState {
   matchBursts: MatchBurst[]
   assistCharges: AssistCharges
   lastHintTileId: string | null
+  elapsedMs: number
   history: GameStateSnapshot[]
 }
 

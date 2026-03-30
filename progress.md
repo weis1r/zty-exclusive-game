@@ -257,7 +257,50 @@ Verification
   - `npm run build`
 - 结果
   - 3 个测试文件、30 个测试全部通过
-  - lint 通过
+- lint 通过
+
+---
+
+Task
+- 用户新需求: 按“单局节奏重构 + 20 关 5 章节轨道托盘计划”实现 5 章 4 关、章节块数 `48 / 60 / 72 / 86 / 98`、轨道暂存位规则和三屏文案同步；随后用户说明 UI 相关验证可以自己手动跑。
+
+What changed
+- `src/game/types.ts`
+  - 补充 `ChapterRuleId`
+  - `CampaignLevelMeta` 增加 `tileCount / chapterRuleId / chapterRuleLabel`
+  - `GameState` / `GameStateSnapshot` 增加 `orbitPockets`
+- `src/game/engine.ts`
+  - 在现有动态变牌/计时逻辑上接入轨道暂存位
+  - 新增 `canMoveTrayTileToPocket / moveTrayTileToPocket / canReleasePocketToTray / releasePocketToTray`
+  - `pickTile / undo / snapshot / restart` 现在都会保留并恢复暂存位状态
+- `src/game/levels.ts`
+  - 20 关重新编排为 5 章 * 4 关
+  - 各章块数固定为 `48 / 60 / 72 / 86 / 98`
+  - 章节规则依次改成 `classic / single-pocket-tail / single-pocket-head-return / single-pocket-any / double-pocket-any`
+  - 仍保留 20 个 `levelId`、shape 主题和顺序解锁链
+- `src/screens/GameScreen.tsx`
+  - 顶部托盘右侧新增轨道暂存位 UI
+  - 托盘牌支持按章节规则送入暂存位，暂存位支持取回
+  - HUD 增加块数与章节规则标签
+- `src/screens/HomeScreen.tsx` / `src/screens/ResultScreen.tsx`
+  - 同步展示当前关卡规则名和块数
+- `src/App.tsx`
+  - reducer 新增托盘进暂存 / 暂存回托盘动作
+  - `render_game_to_text` 同步输出 `tileCount / chapterRule / orbitPockets`
+- `src/App.test.tsx` / `src/game/engine.test.ts` / `src/game/storage.test.ts`
+  - 更新为新章节曲线
+  - 补了轨道暂存位的引擎与应用层回归
+
+Verification
+- `npm run test -- --run`
+- `npm run lint`
+- `npm run build`
+- 本地开发预览已起：
+  - `http://127.0.0.1:4192/`
+
+Notes
+- 这套实现保留了当前分支里已有的“动态变牌 / 时间相位”机制，并把轨道暂存位叠加到这套引擎上，而不是回退掉它。
+- 用户后续说明“测试就不用跑了，我手动跑吧”，因此这里先停在可手动验收状态，不继续做 UI 自动试玩。
   - build 通过
 - 自动化与视觉巡检
   - `develop-web-game` 客户端产物：

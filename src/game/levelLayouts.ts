@@ -25,6 +25,8 @@ interface ShapeProfile {
 
 const BASE_BOARD_WIDTH = 356
 const BASE_BOARD_HEIGHT = 450
+const SHELL_SIZE = 36
+const OPENING_COUNT = 6
 const SOURCE_CENTER_X = 180
 const SOURCE_CENTER_Y = 209
 const SOURCE_HALF_WIDTH = 130
@@ -33,6 +35,11 @@ const TARGET_CENTER_X = SOURCE_CENTER_X
 const TARGET_CENTER_Y = SOURCE_CENTER_Y
 const TARGET_HALF_WIDTH = SOURCE_HALF_WIDTH
 const TARGET_HALF_HEIGHT = SOURCE_HALF_HEIGHT
+const SHELL_OFFSETS: Point[] = [
+  { x: 0, y: 0 },
+  { x: 12, y: 16 },
+  { x: -10, y: 30 },
+]
 
 const BASE_36_SLOTS: TileSlot[] = [
   { x: 134, y: 30, layer: 3 },
@@ -287,32 +294,91 @@ function createBaseLayout(shapeId: ShapeId): TileSlot[] {
   })
 }
 
-function repeatLayout(baseSlots: TileSlot[]): TileSlot[] {
-  const slots: TileSlot[] = []
+function getPartialShellSlots(baseSlots: TileSlot[], partialCount: number) {
+  return [...baseSlots]
+    .sort((leftSlot, rightSlot) => {
+      if (leftSlot.layer !== rightSlot.layer) {
+        return leftSlot.layer - rightSlot.layer
+      }
 
-  for (let copyIndex = 3; copyIndex >= 0; copyIndex -= 1) {
-    const layerOffset = copyIndex * 4
+      if (leftSlot.y !== rightSlot.y) {
+        return leftSlot.y - rightSlot.y
+      }
 
-    baseSlots.forEach((slot) => {
-      slots.push({
-        ...slot,
-        layer: slot.layer + layerOffset,
-      })
+      return leftSlot.x - rightSlot.x
     })
-  }
-
-  return slots
+    .slice(0, partialCount)
 }
 
-function createLayout(shapeId: ShapeId): LevelLayoutDefinition {
+function applyShellOffset(slot: TileSlot, shellIndex: number): TileSlot {
+  const offset = SHELL_OFFSETS[shellIndex] ?? {
+    x: (shellIndex % 2 === 0 ? -1 : 1) * 10,
+    y: shellIndex * 14,
+  }
+
   return {
-    slots: repeatLayout(createBaseLayout(shapeId)),
+    x: clamp(slot.x + offset.x, 24, BASE_BOARD_WIDTH - 24),
+    y: clamp(slot.y + offset.y, 24, BASE_BOARD_HEIGHT - 24),
+    layer: slot.layer + shellIndex * 4,
+  }
+}
+
+function sortSlotsForPlay(slots: TileSlot[]) {
+  return [...slots].sort((leftSlot, rightSlot) => {
+    if (leftSlot.layer !== rightSlot.layer) {
+      return rightSlot.layer - leftSlot.layer
+    }
+
+    if (leftSlot.y !== rightSlot.y) {
+      return leftSlot.y - rightSlot.y
+    }
+
+    return leftSlot.x - rightSlot.x
+  })
+}
+
+function createBaseShellDefinition(shapeId: ShapeId): LevelLayoutDefinition {
+  return {
+    slots: createBaseLayout(shapeId),
     boardWidth: BASE_BOARD_WIDTH,
     boardHeight: BASE_BOARD_HEIGHT,
-    openingCount: 6,
+    openingCount: OPENING_COUNT,
   }
 }
 
 export const LEVEL_LAYOUTS: Record<ShapeId, LevelLayoutDefinition> = Object.fromEntries(
-  (Object.keys(SHAPE_PROFILES) as ShapeId[]).map((shapeId) => [shapeId, createLayout(shapeId)]),
+  (Object.keys(SHAPE_PROFILES) as ShapeId[]).map((shapeId) => [
+    shapeId,
+    createBaseShellDefinition(shapeId),
+  ]),
 ) as Record<ShapeId, LevelLayoutDefinition>
+
+export function getLevelLayout(shapeId: ShapeId, tileCount: number): LevelLayoutDefinition {
+  if (tileCount <= 0 || tileCount % 2 !== 0) {
+    throw new Error(`Invalid tile count ${tileCount} for shape ${shapeId}`)
+  }
+
+  const baseLayout = LEVEL_LAYOUTS[shapeId]
+  const fullShellCount = Math.floor(tileCount / SHELL_SIZE)
+  const partialCount = tileCount % SHELL_SIZE
+  const slots: TileSlot[] = []
+
+  for (let shellIndex = 0; shellIndex < fullShellCount; shellIndex += 1) {
+    baseLayout.slots.forEach((slot) => {
+      slots.push(applyShellOffset(slot, shellIndex))
+    })
+  }
+
+  if (partialCount > 0) {
+    getPartialShellSlots(baseLayout.slots, partialCount).forEach((slot) => {
+      slots.push(applyShellOffset(slot, fullShellCount))
+    })
+  }
+
+  return {
+    slots: sortSlotsForPlay(slots),
+    boardWidth: baseLayout.boardWidth,
+    boardHeight: baseLayout.boardHeight,
+    openingCount: baseLayout.openingCount,
+  }
+}

@@ -23,6 +23,8 @@ export function HomeScreen({
   const levelOrder = currentLevel.campaign?.order ?? 1
   const shapeId = currentLevel.campaign?.shapeId
   const shapeLabel = currentLevel.campaign?.shapeLabel
+  const tileCount = currentLevel.campaign?.tileCount ?? currentLevel.tiles.length
+  const chapterRuleLabel = currentLevel.campaign?.chapterRuleLabel ?? '基础堆叠'
 
   return (
     <section className="home-screen" data-testid="home-screen">
@@ -71,6 +73,10 @@ export function HomeScreen({
         <p className="home-screen__eyebrow">当前可玩</p>
         <ShapeBadge shapeId={shapeId} shapeLabel={shapeLabel} className="home-screen__shape-chip" />
         <h1>关卡 {levelOrder}</h1>
+        <p className="home-screen__meta-line">
+          <span data-testid="home-rule-label">{chapterRuleLabel}</span>
+          <span>{tileCount} 块</span>
+        </p>
         <p className="home-screen__current-note">完成本关后自动解锁下一关</p>
       </div>
 

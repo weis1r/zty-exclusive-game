@@ -6,6 +6,9 @@ export interface RoundSummary {
   levelOrder: number
   shapeId: string | null
   shapeLabel: string | null
+  tileCount: number | null
+  chapterRuleId: string | null
+  chapterRuleLabel: string | null
   nextLevelId: string | null
   nextLevelOrder: number | null
   selectedCount: number

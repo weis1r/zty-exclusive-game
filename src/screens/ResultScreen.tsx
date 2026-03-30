@@ -43,6 +43,10 @@ export function ResultScreen({ summary, onPrimary, onSecondary }: ResultScreenPr
         <p className="result-card__eyebrow">{isWon ? '关卡完成' : '本关失败'}</p>
         <h2 className="result-card__title">{isWon ? '本局通关' : '再试一次'}</h2>
         <p className="result-card__subtitle">关卡 {summary.levelOrder}</p>
+        <p className="result-card__meta">
+          <span data-testid="result-rule-label">{summary.chapterRuleLabel ?? '基础堆叠'}</span>
+          <span>{summary.tileCount ?? 0} 块</span>
+        </p>
 
         <div className="result-card__stats">
           <div className="result-stat">

@@ -132,15 +132,15 @@ describe('campaign helpers and storage', () => {
 
     expect(progress.version).toBe(2)
     expect(progress.currentLevelId).toBe('mirror-court-04')
-    expect(progress.currentChapterId).toBe('chapter-mirror-court')
-    expect(progress.chapterRecords['chapter-bloom-path'].completed).toBe(true)
+    expect(progress.currentChapterId).toBe('chapter-bloom-path')
+    expect(progress.chapterRecords['chapter-bloom-path'].completed).toBe(false)
     expect(progress.chapterRecords['chapter-bloom-path'].completedLevelIds).toEqual([
       'thorn-garden-01',
       'lantern-steps-02',
       'ivy-arcade-03',
     ])
-    expect(progress.chapterRecords['chapter-mirror-court'].unlocked).toBe(true)
-    expect(progress.chapterRecords['chapter-mirror-court'].unlockedLevelIds).toContain(
+    expect(progress.chapterRecords['chapter-bloom-path'].unlocked).toBe(true)
+    expect(progress.chapterRecords['chapter-bloom-path'].unlockedLevelIds).toContain(
       'mirror-court-04',
     )
     expect(
@@ -183,7 +183,8 @@ describe('campaign helpers and storage', () => {
     expect(progress.levelRecords['crown-greenhouse-06'].completed).toBe(true)
     expect(progress.levelRecords['sunset-orchard-07'].unlocked).toBe(true)
     expect(progress.unlockedLevelIds).toContain('sunset-orchard-07')
-    expect(progress.chapterRecords['chapter-mirror-court'].completed).toBe(true)
+    expect(progress.chapterRecords['chapter-bloom-path'].completed).toBe(true)
+    expect(progress.chapterRecords['chapter-mirror-court'].completed).toBe(false)
   })
 
   it('resets persisted progress back to the opening level', () => {

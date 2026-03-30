@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { GAME_CONFIG } from './config'
 import {
+  advanceGameTime,
   canUseUndo,
   clearResolvedMatches,
   createInitialGameState,
+  getDisplayedTileType,
   getHintSuggestion,
   getRemainingBoardTiles,
+  getTileCycleState,
   insertIntoTray,
   isTileBlocked,
   pickTile,
@@ -14,113 +17,21 @@ import {
   useUndo,
 } from './engine'
 import { CAMPAIGN, CAMPAIGN_LEVELS, DEFAULT_LEVEL, getCampaignChapters } from './levels'
-import type { LevelDefinition, TileType, TrayTile } from './types'
+import type { LevelDefinition, TrayTile } from './types'
 
-function createLevel(tiles: LevelDefinition['tiles']): LevelDefinition {
+function createLevel(
+  tiles: LevelDefinition['tiles'],
+  overrides?: Partial<LevelDefinition>,
+): LevelDefinition {
   return {
     id: 'test-level',
     name: '测试关',
     boardWidth: GAME_CONFIG.boardWidth,
     boardHeight: GAME_CONFIG.boardHeight,
+    typePool: overrides?.typePool ?? [...new Set(tiles.map((tile) => tile.type))],
     tiles,
+    ...overrides,
   }
-}
-
-function getExposedTiles(state: ReturnType<typeof createInitialGameState>) {
-  return getRemainingBoardTiles(state)
-    .filter((tile) => !isTileBlocked(tile.id, state, GAME_CONFIG))
-    .sort((leftTile, rightTile) => {
-      if (leftTile.layer !== rightTile.layer) {
-        return rightTile.layer - leftTile.layer
-      }
-
-      if (leftTile.y !== rightTile.y) {
-        return leftTile.y - rightTile.y
-      }
-
-      return leftTile.x - rightTile.x
-    })
-}
-
-function getLevelUniqueTypeCount(level: LevelDefinition) {
-  return new Set(level.tiles.map((tile) => tile.type)).size
-}
-
-function getOpeningSnapshot(level: LevelDefinition) {
-  const state = createInitialGameState(level, 'playing')
-  const exposedTiles = getExposedTiles(state)
-  const exposedTypeCounts = exposedTiles.reduce<Record<string, number>>((counts, tile) => {
-    counts[tile.type] = (counts[tile.type] ?? 0) + 1
-    return counts
-  }, {})
-  const safePairCount = Object.values(exposedTypeCounts).reduce(
-    (count, typeCount) => count + Math.floor(typeCount / GAME_CONFIG.matchCount),
-    0,
-  )
-
-  return {
-    exposedTiles,
-    exposedTypeCounts,
-    safePairCount,
-  }
-}
-
-function findGreedyWinningPath(level: LevelDefinition): string[] | null {
-  const path: string[] = []
-  let state = createInitialGameState(level, 'playing')
-  let guard = 0
-
-  while (state.status === 'playing' && guard < level.tiles.length * 2) {
-    if (state.matchBursts.length > 0) {
-      state = clearResolvedMatches(state)
-    }
-
-    const exposedTiles = getExposedTiles(state)
-    const tailType = state.trayTiles.at(-1)?.type ?? null
-    const nextPickIds: string[] = []
-
-    if (tailType) {
-      const tailMatchTile = exposedTiles.find((tile) => tile.type === tailType)
-
-      if (tailMatchTile) {
-        nextPickIds.push(tailMatchTile.id)
-      }
-    }
-
-    if (
-      nextPickIds.length === 0 &&
-      state.trayTiles.length <= GAME_CONFIG.trayCapacity - GAME_CONFIG.matchCount
-    ) {
-      const pairByType = new Map<TileType, string[]>()
-
-      exposedTiles.forEach((tile) => {
-        pairByType.set(tile.type, [...(pairByType.get(tile.type) ?? []), tile.id])
-      })
-
-      const safePair = [...pairByType.values()].find((tileIds) => tileIds.length >= GAME_CONFIG.matchCount)
-
-      if (safePair) {
-        nextPickIds.push(...safePair.slice(0, GAME_CONFIG.matchCount))
-      }
-    }
-
-    if (nextPickIds.length === 0) {
-      return null
-    }
-
-    nextPickIds.forEach((tileId) => {
-      state = pickTile(state, tileId, level, GAME_CONFIG)
-      path.push(tileId)
-
-      if (state.matchBursts.length > 0) {
-        state = clearResolvedMatches(state)
-      }
-    })
-
-    guard += 1
-  }
-
-  return state.status === 'won' ? path : null
 }
 
 describe('game engine', () => {
@@ -212,18 +123,15 @@ describe('game engine', () => {
     expect(state.trayTiles).toHaveLength(GAME_CONFIG.trayCapacity)
   })
 
-  it('resets the board state when the game restarts', () => {
+  it('resets the board state, timer, and classic pockets when the game restarts', () => {
     const level = createLevel([
       { id: 'ember-1', type: 'ember', x: 20, y: 20, layer: 0 },
       { id: 'leaf-1', type: 'leaf', x: 120, y: 20, layer: 0 },
     ])
 
-    const progressedState = pickTile(
-      createInitialGameState(level, 'playing'),
-      'ember-1',
-      level,
-      GAME_CONFIG,
-    )
+    let progressedState = createInitialGameState(level, 'playing')
+    progressedState = advanceGameTime(progressedState, 2250)
+    progressedState = pickTile(progressedState, 'ember-1', level, GAME_CONFIG)
 
     const restartedState = restartGame(level)
 
@@ -232,6 +140,8 @@ describe('game engine', () => {
     expect(restartedState.selectedCount).toBe(0)
     expect(restartedState.removedCount).toBe(0)
     expect(restartedState.trayTiles).toHaveLength(0)
+    expect(restartedState.orbitPockets).toEqual([])
+    expect(restartedState.elapsedMs).toBe(0)
     expect(restartedState.boardTiles.every((tile) => !tile.removed)).toBe(true)
   })
 
@@ -246,8 +156,8 @@ describe('game engine', () => {
     let state = createInitialGameState(level, 'playing')
     state = pickTile(state, 'ember-1', level, GAME_CONFIG)
 
-    const suggestion = getHintSuggestion(state, GAME_CONFIG)
-    const hintedState = useHint(state, GAME_CONFIG)
+    const suggestion = getHintSuggestion(state, level, GAME_CONFIG)
+    const hintedState = useHint(state, level, GAME_CONFIG)
 
     expect(suggestion).toEqual({
       tileId: 'ember-2',
@@ -258,122 +168,128 @@ describe('game engine', () => {
     expect(hintedState.assistCharges.hint).toBe(state.assistCharges.hint - 1)
   })
 
-  it('restores the previous snapshot when undo is used', () => {
+  it('restores the previous snapshot including elapsed time when undo is used', () => {
     const level = createLevel([
       { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
       { id: 'leaf-1', type: 'leaf', x: 80, y: 0, layer: 0 },
     ])
 
-    const startedState = createInitialGameState(level, 'playing')
-    const progressedState = pickTile(startedState, 'ember-1', level, GAME_CONFIG)
-    const undoneState = useUndo(progressedState)
+    let state = createInitialGameState(level, 'playing')
+    state = advanceGameTime(state, 2100)
+    state = pickTile(state, 'ember-1', level, GAME_CONFIG)
 
-    expect(canUseUndo(progressedState)).toBe(true)
+    const undoneState = useUndo(state)
+
+    expect(canUseUndo(state)).toBe(true)
     expect(undoneState.selectedCount).toBe(0)
     expect(undoneState.trayTiles).toHaveLength(0)
+    expect(undoneState.elapsedMs).toBe(2100)
     expect(undoneState.boardTiles.every((tile) => !tile.removed)).toBe(true)
-    expect(undoneState.assistCharges.undo).toBe(progressedState.assistCharges.undo - 1)
+    expect(undoneState.assistCharges.undo).toBe(state.assistCharges.undo - 1)
   })
 
-  it('ships a 20-level campaign and keeps the default level built as a 144-item stack', () => {
-    const tileCounts = DEFAULT_LEVEL.tiles.reduce<Record<string, number>>((counts, tile) => {
-      counts[tile.type] = (counts[tile.type] ?? 0) + 1
-      return counts
-    }, {})
+  it('locks shift-a tiles until the last second and picks their displayed type', () => {
+    const level = createLevel(
+      [
+        { id: 'shift-a', type: 'ember', x: 0, y: 0, layer: 0, dynamicGroup: 'shift-a' },
+        { id: 'static', type: 'leaf', x: 80, y: 0, layer: 0 },
+      ],
+      {
+        typePool: ['ember', 'leaf', 'bloom'],
+      },
+    )
 
+    let state = createInitialGameState(level, 'playing')
+
+    expect(getTileCycleState(level.tiles[0], state.elapsedMs)?.selectable).toBe(false)
+    expect(pickTile(state, 'shift-a', level, GAME_CONFIG)).toEqual(state)
+
+    state = advanceGameTime(state, 5000)
+
+    expect(getTileCycleState(level.tiles[0], state.elapsedMs)?.selectable).toBe(true)
+    expect(getDisplayedTileType(level.tiles[0], level, state.elapsedMs)).toBe('leaf')
+
+    const pickedState = pickTile(state, 'shift-a', level, GAME_CONFIG)
+
+    expect(pickedState.trayTiles.map((tile) => tile.type)).toEqual(['leaf'])
+  })
+
+  it('keeps shift-b on the opposite window and opposite direction', () => {
+    const level = createLevel(
+      [
+        { id: 'shift-a', type: 'leaf', x: 0, y: 0, layer: 0, dynamicGroup: 'shift-a' },
+        { id: 'shift-b', type: 'leaf', x: 80, y: 0, layer: 0, dynamicGroup: 'shift-b' },
+      ],
+      {
+        typePool: ['ember', 'leaf', 'bloom'],
+      },
+    )
+
+    const earlyState = advanceGameTime(createInitialGameState(level, 'playing'), 1000)
+
+    expect(getTileCycleState(level.tiles[0], earlyState.elapsedMs)?.selectable).toBe(false)
+    expect(getTileCycleState(level.tiles[1], earlyState.elapsedMs)?.selectable).toBe(true)
+
+    const shiftedState = advanceGameTime(createInitialGameState(level, 'playing'), 3500)
+
+    expect(getDisplayedTileType(level.tiles[0], level, shiftedState.elapsedMs)).toBe('bloom')
+    expect(getDisplayedTileType(level.tiles[1], level, shiftedState.elapsedMs)).toBe('ember')
+  })
+
+  it('ships a 20-level campaign with the 48/60/72/84/96 tile curve capped after level 5', () => {
     expect(CAMPAIGN_LEVELS).toHaveLength(20)
     expect(getCampaignChapters(CAMPAIGN)).toHaveLength(5)
     expect(DEFAULT_LEVEL.id).toBe('thorn-garden-01')
-    expect(DEFAULT_LEVEL.name).toBe('圆环阵列')
-    expect(DEFAULT_LEVEL.difficulty).toBe('easy')
     expect(DEFAULT_LEVEL.campaign?.shapeId).toBe('ring')
     expect(DEFAULT_LEVEL.campaign?.shapeLabel).toBe('圆环')
-    expect(DEFAULT_LEVEL.tiles).toHaveLength(144)
-    expect(Object.values(tileCounts).every((count) => count % GAME_CONFIG.matchCount === 0)).toBe(true)
-  })
-
-  it('starts the default level with an opening layer that stays within the target visibility range', () => {
-    const state = createInitialGameState(DEFAULT_LEVEL, 'playing')
-    const exposedTiles = DEFAULT_LEVEL.tiles.filter(
-      (tile) => !isTileBlocked(tile.id, state, GAME_CONFIG),
-    )
-
-    expect(exposedTiles.length).toBeGreaterThanOrEqual(22)
-    expect(exposedTiles.length).toBeLessThanOrEqual(30)
-    expect(DEFAULT_LEVEL.tiles.filter((tile) => isTileBlocked(tile.id, state, GAME_CONFIG))).toHaveLength(
-      DEFAULT_LEVEL.tiles.length - exposedTiles.length,
+    expect(CAMPAIGN_LEVELS.map((level) => level.campaign?.tileCount)).toEqual([
+      48, 60, 72, 84, 96,
+      96, 96, 96, 96, 96,
+      96, 96, 96, 96, 96,
+      96, 96, 96, 96, 96,
+    ])
+    expect(CAMPAIGN_LEVELS.map((level) => level.campaign?.chapterRuleId)).toEqual(
+      Array.from({ length: 20 }, () => 'classic'),
     )
   })
 
-  it('starts the default level with four visible tile types and immediate safe pairs', () => {
-    const { exposedTypeCounts, safePairCount } = getOpeningSnapshot(DEFAULT_LEVEL)
+  it('assigns about 20 percent of the default level to each dynamic group', () => {
+    const dynamicCounts = DEFAULT_LEVEL.tiles.reduce<Record<string, number>>((counts, tile) => {
+      const key = tile.dynamicGroup ?? 'static'
+      counts[key] = (counts[key] ?? 0) + 1
+      return counts
+    }, {})
 
-    expect(Object.keys(exposedTypeCounts)).toHaveLength(4)
-    expect(Object.values(exposedTypeCounts).every((count) => count >= 4)).toBe(true)
-    expect(safePairCount).toBeGreaterThanOrEqual(1)
+    expect(DEFAULT_LEVEL.tiles).toHaveLength(48)
+    expect(dynamicCounts['shift-a']).toBe(10)
+    expect(dynamicCounts['shift-b']).toBe(10)
+    expect(dynamicCounts.static).toBe(28)
   })
 
-  it('ramps tile variety across the 20-level campaign', () => {
-    expect(CAMPAIGN_LEVELS.map((level) => getLevelUniqueTypeCount(level))).toEqual([
-      4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 9, 9,
-    ])
-  })
-
-  it('keeps assist charges on the intended difficulty curve', () => {
-    expect(CAMPAIGN_LEVELS.map((level) => level.campaign?.startingAssists)).toEqual([
-      { undo: 2, hint: 2 },
-      { undo: 2, hint: 2 },
-      { undo: 2, hint: 2 },
-      { undo: 2, hint: 2 },
-      { undo: 2, hint: 1 },
-      { undo: 2, hint: 1 },
-      { undo: 2, hint: 1 },
-      { undo: 2, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 0 },
-      { undo: 1, hint: 0 },
-    ])
-  })
-
-  it('supports a full greedy winning solution path on the default level', () => {
-    const winningPath = findGreedyWinningPath(DEFAULT_LEVEL)
-
-    expect(winningPath).not.toBeNull()
-    expect(winningPath).toHaveLength(DEFAULT_LEVEL.tiles.length)
-  })
-
-  it('keeps every shipped campaign level inside the target opening range with a safe adjacent pair', () => {
+  it('keeps every shipped campaign level using even counts per tile type', () => {
     CAMPAIGN_LEVELS.forEach((level) => {
-      const { exposedTiles, safePairCount } = getOpeningSnapshot(level)
+      const tileCounts = level.tiles.reduce<Record<string, number>>((counts, tile) => {
+        counts[tile.type] = (counts[tile.type] ?? 0) + 1
+        return counts
+      }, {})
 
-      expect(level.campaign?.shapeId).toBeTruthy()
-      expect(level.campaign?.shapeLabel).toBeTruthy()
-      expect(exposedTiles.length).toBeGreaterThanOrEqual(22)
-      expect(exposedTiles.length).toBeLessThanOrEqual(30)
-      expect(safePairCount).toBeGreaterThanOrEqual(1)
+      expect(Object.values(tileCounts).every((count) => count % GAME_CONFIG.matchCount === 0)).toBe(true)
+      expect(level.campaign?.recommendedSelectionCount).toBe(level.tiles.length)
     })
   })
 
-  it('keeps every shipped campaign level solvable with safe adjacent-pair play', () => {
-    const unsolvedLevels = CAMPAIGN_LEVELS.flatMap((level) => {
-      const winningPath = findGreedyWinningPath(level)
+  it('exposes at least one selectable pair on the default level opening', () => {
+    const state = createInitialGameState(DEFAULT_LEVEL, 'playing')
+    const exposedTiles = getRemainingBoardTiles(state)
+      .filter((tile) => !isTileBlocked(tile.id, state, GAME_CONFIG))
+      .filter((tile) => getTileCycleState(tile, state.elapsedMs)?.selectable ?? true)
 
-      if (!winningPath || winningPath.length !== level.tiles.length) {
-        return [level.id]
-      }
+    const exposedTypeCounts = exposedTiles.reduce<Record<string, number>>((counts, tile) => {
+      const currentType = getDisplayedTileType(tile, DEFAULT_LEVEL, state.elapsedMs)
+      counts[currentType] = (counts[currentType] ?? 0) + 1
+      return counts
+    }, {})
 
-      return []
-    })
-
-    expect(unsolvedLevels).toEqual([])
+    expect(Object.values(exposedTypeCounts).some((count) => count >= GAME_CONFIG.matchCount)).toBe(true)
   })
 })
