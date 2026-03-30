@@ -111,7 +111,12 @@ const WORLD_SUBTITLE = '花园远征'
 const CHAPTER_TILE_STEPS = [48, 60, 72, 84]
 const AUTO_HINT_IDLE_MS = 7000
 const AUTO_HINT_FLASH_MS = 1700
-const QUICK_SHIFT_INTERVAL_MS = 1000
+const QUICK_SHIFT_OPENING_MS = 2400
+const QUICK_SHIFT_INTERVAL_START_MS = 1560
+const QUICK_SHIFT_INTERVAL_END_MS = 1080
+const QUICK_SHIFT_DENSE_BOARD_BONUS_MS = 120
+const QUICK_SHIFT_TRAY_GRACE_MS = 180
+const QUICK_SHIFT_PROGRESS_TICK_MS = 100
 const QUICK_SHIFT_FLASH_MS = 560
 
 type UiSoundKind = 'pick' | 'hint' | 'undo' | 'match' | 'win' | 'lose'
@@ -352,13 +357,73 @@ function getQuickPlayLevel(
   campaignLevels: LevelDefinition[],
   progress: CampaignProgress,
   fallbackLevel: LevelDefinition,
-) {
-  return (
-    campaignLevels
-      .slice()
-      .reverse()
-      .find((level) => progress.levelRecords[level.id]?.unlocked) ?? fallbackLevel
+): LevelDefinition {
+  const unlockedLevels = campaignLevels.filter(
+    (level) => progress.levelRecords[level.id]?.unlocked,
   )
+
+  if (unlockedLevels.length === 0) {
+    return fallbackLevel
+  }
+
+  const currentUnlockedLevel =
+    unlockedLevels.find((level) => level.id === progress.currentLevelId) ?? null
+  const preferredQuickLevel = unlockedLevels
+    .filter((level) => level.difficulty !== 'hard' && level.tiles.length <= 72)
+    .at(-1)
+
+  if (
+    currentUnlockedLevel &&
+    currentUnlockedLevel.difficulty !== 'hard' &&
+    currentUnlockedLevel.tiles.length <= 72
+  ) {
+    return currentUnlockedLevel
+  }
+
+  const latestUnlockedLevel = unlockedLevels[unlockedLevels.length - 1]
+
+  return preferredQuickLevel ?? currentUnlockedLevel ?? latestUnlockedLevel ?? fallbackLevel
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function getQuickShiftWindowMs({
+  totalTiles,
+  remainingTiles,
+  trayCount,
+  cycleIndex,
+}: {
+  totalTiles: number
+  remainingTiles: number
+  trayCount: number
+  cycleIndex: number
+}) {
+  if (cycleIndex === 0) {
+    return QUICK_SHIFT_OPENING_MS
+  }
+
+  const clearedRatio = totalTiles <= 0 ? 0 : 1 - remainingTiles / totalTiles
+  const denseBoardBonus = totalTiles >= 72 ? QUICK_SHIFT_DENSE_BOARD_BONUS_MS : 0
+  const trayGrace = trayCount > 0 ? QUICK_SHIFT_TRAY_GRACE_MS : 0
+  const maxWindow = QUICK_SHIFT_INTERVAL_START_MS + denseBoardBonus + trayGrace
+  const acceleratedWindow = maxWindow - clearedRatio * 360
+
+  return clampNumber(
+    Math.round(acceleratedWindow),
+    QUICK_SHIFT_INTERVAL_END_MS,
+    maxWindow,
+  )
+}
+
+function formatQuickCountdown(durationMs: number | null) {
+  if (durationMs === null) {
+    return '暂停中'
+  }
+
+  const countdown = Math.max(0, durationMs) / 1000
+  return `${countdown.toFixed(1)} 秒`
 }
 
 function getChapterSummaries(
@@ -763,8 +828,12 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   const [completionDurationMs, setCompletionDurationMs] = useState<number | null>(null)
   const [passiveHintTileId, setPassiveHintTileId] = useState<string | null>(null)
   const [quickShiftTileIds, setQuickShiftTileIds] = useState<string[]>([])
+  const [quickShiftCycleIndex, setQuickShiftCycleIndex] = useState(0)
+  const [quickShiftCount, setQuickShiftCount] = useState(0)
+  const [quickShiftRemainingMs, setQuickShiftRemainingMs] = useState<number | null>(null)
   const completionKeyRef = useRef<string | null>(null)
   const quickShiftCursorRef = useRef(0)
+  const quickShiftNextAtRef = useRef<number | null>(null)
 
   const currentLevel = getCampaignLevelById(selectedLevelId, campaign) ?? fallbackLevel
   const [state, dispatch] = useReducer(
@@ -858,6 +927,40 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     state.lastHintTileId === null
   const quickShiftActive = view === 'game' && sessionMode === 'quick'
   const shiftingTileIdSet = new Set(quickShiftTileIds)
+  const quickTargetPairCount = Math.ceil(currentLevel.tiles.length / config.matchCount)
+  const quickRemainingPairCount = Math.ceil(remainingCount / config.matchCount)
+  const quickShiftPhase = !quickShiftActive
+    ? 'inactive'
+    : quickShiftCycleIndex === 0
+      ? 'opening'
+      : 'cycling'
+  const quickShiftWindowMs =
+    quickShiftActive && state.status === 'playing' && !isResolvingMatch
+      ? getQuickShiftWindowMs({
+          totalTiles: currentLevel.tiles.length,
+          remainingTiles: remainingCount,
+          trayCount: state.trayTiles.length,
+          cycleIndex: quickShiftCycleIndex,
+        })
+      : null
+  const quickShiftDisplayMs =
+    quickShiftActive && state.status === 'playing' && !isResolvingMatch && !gameMenuOpen
+      ? quickShiftRemainingMs ?? quickShiftWindowMs
+      : null
+  const quickShiftProgressRatio =
+    quickShiftWindowMs !== null && quickShiftDisplayMs !== null
+      ? Math.max(0, Math.min(1, 1 - quickShiftDisplayMs / quickShiftWindowMs))
+      : 0
+  const quickStatusTitle =
+    quickShiftPhase === 'opening' ? '开局观察期' : gameMenuOpen ? '轮换已暂停' : '轮换进行中'
+  const quickStatusCopy =
+    quickShiftPhase === 'opening'
+      ? '先认清露出的安全对子，第一轮轮换前尽量把开门顺序理顺。'
+      : gameMenuOpen
+        ? '菜单打开时会暂停轮换，收拾好再继续这一局。'
+        : state.trayTiles.length > 0
+          ? '顶部槽里已经有单张，优先补成对子，别把节奏拖进下一轮换。'
+          : '盯住亮边可点牌，轮换前先拿下最稳的一对。'
 
   function playSound(kind: UiSoundKind) {
     if (!soundEnabled) {
@@ -875,6 +978,12 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     playUiSound(kind)
   })
 
+  function toggleGameMenu() {
+    quickShiftNextAtRef.current = null
+    setQuickShiftRemainingMs(null)
+    setGameMenuOpen((currentValue) => !currentValue)
+  }
+
   const triggerQuickShift = useEffectEvent(() => {
     if (view !== 'game' || sessionMode !== 'quick' || state.status !== 'playing' || isResolvingMatch) {
       return
@@ -889,6 +998,9 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     quickShiftCursorRef.current += 1
     setPassiveHintTileId(null)
     setQuickShiftTileIds(plan.shiftedTileIds)
+    setQuickShiftCount((currentCount) => currentCount + 1)
+    quickShiftNextAtRef.current = null
+    setQuickShiftRemainingMs(0)
     dispatch({ type: 'quick-shift', typeMap: plan.typeMap })
   })
 
@@ -897,18 +1009,63 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   }, [soundEnabled])
 
   useEffect(() => {
-    if (!quickShiftActive || state.status !== 'playing' || isResolvingMatch) {
+    if (
+      !quickShiftActive ||
+      state.status !== 'playing' ||
+      isResolvingMatch ||
+      gameMenuOpen ||
+      quickShiftWindowMs === null
+    ) {
+      quickShiftNextAtRef.current = null
       return
     }
 
+    quickShiftNextAtRef.current = Date.now() + quickShiftWindowMs
+
     const timer = window.setTimeout(() => {
+      setQuickShiftRemainingMs(null)
+      setQuickShiftCycleIndex((currentIndex) => currentIndex + 1)
       triggerQuickShift()
-    }, QUICK_SHIFT_INTERVAL_MS)
+    }, quickShiftWindowMs)
 
     return () => {
       window.clearTimeout(timer)
     }
-  }, [config, isResolvingMatch, quickShiftActive, state.boardTiles, state.status, state.trayTiles.length])
+  }, [
+    gameMenuOpen,
+    isResolvingMatch,
+    quickShiftActive,
+    quickShiftWindowMs,
+    state.boardTiles,
+    state.status,
+    state.trayTiles.length,
+  ])
+
+  useEffect(() => {
+    if (
+      !quickShiftActive ||
+      state.status !== 'playing' ||
+      isResolvingMatch ||
+      gameMenuOpen ||
+      quickShiftNextAtRef.current === null
+    ) {
+      return
+    }
+
+    const updateCountdown = () => {
+      if (quickShiftNextAtRef.current === null) {
+        return
+      }
+
+      setQuickShiftRemainingMs(Math.max(0, quickShiftNextAtRef.current - Date.now()))
+    }
+
+    const timer = window.setInterval(updateCountdown, QUICK_SHIFT_PROGRESS_TICK_MS)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [gameMenuOpen, isResolvingMatch, quickShiftActive, quickShiftWindowMs, state.status])
 
   useEffect(() => {
     if (quickShiftTileIds.length === 0) {
@@ -1012,6 +1169,18 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
         lastHintTileId: state.lastHintTileId,
         autoHintTileId: passiveHintTileId,
         quickShiftTileIds,
+        quickSession: quickShiftActive
+          ? {
+              phase: quickShiftPhase,
+              paused: gameMenuOpen,
+              nextShiftInMs:
+                state.status === 'playing' && !gameMenuOpen ? quickShiftDisplayMs : null,
+              currentWindowMs: state.status === 'playing' ? quickShiftWindowMs : null,
+              shiftCount: quickShiftCount,
+              targetPairs: quickTargetPairCount,
+              remainingPairs: quickRemainingPairCount,
+            }
+          : null,
         remainingCount: getRemainingBoardTiles(state).length,
         exposedTiles: getRemainingBoardTiles(state)
           .filter((tile) => !isTileBlocked(tile.id, state, config))
@@ -1043,12 +1212,21 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     matchedPairs,
     passiveHintTileId,
     quickShiftTileIds,
+    quickShiftCount,
+    quickShiftPhase,
+    quickShiftActive,
+    quickShiftDisplayMs,
+    quickShiftRemainingMs,
+    quickShiftWindowMs,
+    quickRemainingPairCount,
+    quickTargetPairCount,
     sessionMode,
     selectedChapterId,
     selectedLevelId,
     state,
     unlockedCount,
     view,
+    gameMenuOpen,
   ])
 
   useEffect(() => {
@@ -1100,11 +1278,12 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
       return
     }
 
+    const passiveHintDelay = quickShiftActive ? 3200 : AUTO_HINT_IDLE_MS
     const timer = window.setTimeout(() => {
       if (hintSuggestion) {
         setPassiveHintTileId(hintSuggestion.tileId)
       }
-    }, AUTO_HINT_IDLE_MS)
+    }, passiveHintDelay)
 
     return () => {
       window.clearTimeout(timer)
@@ -1112,6 +1291,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   }, [
     canDisplayPassiveHint,
     hintSuggestion,
+    quickShiftActive,
   ])
 
   useEffect(() => {
@@ -1171,6 +1351,15 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     })
   }, [campaign, currentLevel, sessionMode, startedAt, state.levelId, state.selectedCount, state.status])
 
+  function resetQuickRoundState() {
+    setQuickShiftTileIds([])
+    setQuickShiftCycleIndex(0)
+    setQuickShiftCount(0)
+    quickShiftNextAtRef.current = null
+    setQuickShiftRemainingMs(null)
+    quickShiftCursorRef.current = 0
+  }
+
   function startLevel(levelId: string, mode: SessionMode = 'campaign') {
     const nextLevelDefinition = getCampaignLevelById(levelId, campaign)
     const isUnlocked = campaignProgress.levelRecords[levelId]?.unlocked ?? false
@@ -1192,8 +1381,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     })
     setCompletionDurationMs(null)
     setPassiveHintTileId(null)
-    setQuickShiftTileIds([])
-    quickShiftCursorRef.current = 0
+    resetQuickRoundState()
     setGameMenuOpen(false)
     setSessionMode(mode)
     setStartedAt(Date.now())
@@ -1209,8 +1397,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     })
     setCompletionDurationMs(null)
     setPassiveHintTileId(null)
-    setQuickShiftTileIds([])
-    quickShiftCursorRef.current = 0
+    resetQuickRoundState()
     setGameMenuOpen(false)
     setStartedAt(Date.now())
     dispatch({ type: 'restart' })
@@ -1219,8 +1406,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   function returnToCampaign() {
     completionKeyRef.current = null
     setPassiveHintTileId(null)
-    setQuickShiftTileIds([])
-    quickShiftCursorRef.current = 0
+    resetQuickRoundState()
     setGameMenuOpen(false)
     setSessionMode('campaign')
     setView('campaign')
@@ -1265,8 +1451,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     completionKeyRef.current = null
     setCompletionDurationMs(null)
     setPassiveHintTileId(null)
-    setQuickShiftTileIds([])
-    quickShiftCursorRef.current = 0
+    resetQuickRoundState()
     setCampaignProgress(nextProgress)
     setSelectedLevelId(nextProgress.currentLevelId)
     setSessionMode('campaign')
@@ -1340,7 +1525,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                   </span>
                   <span>{getRecommendedGoal(currentLevel)}</span>
                   <span>快速单局默认使用：{quickPlayLevel.name}</span>
-                  <span>快速模式会每 1 秒轮换一批可点击牌，拼手速凑对子。</span>
+                  <span>快速模式会先给 2.4 秒观察期，再按局势每 1.1 到 1.7 秒轮换一批可点牌。</span>
+                  <span>默认会优先选已解锁里更顺手的练习桌面，不直接把你推进最硬的一局。</span>
                 </div>
               </div>
             </section>
@@ -1448,7 +1634,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
               <div className="rule-chip">暖白麻将砖</div>
               <div className="rule-chip">深绿桌布</div>
               <div className="rule-chip">顶部四格槽</div>
-              <div className="rule-chip">快速单局 · 1秒轮换</div>
+              <div className="rule-chip">快速单局 · 观察期开局</div>
             </div>
 
             <div className="campaign-actions">
@@ -1612,7 +1798,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                   type="button"
                   className="game-hud__round-button"
                   aria-label="单局菜单"
-                  onClick={() => setGameMenuOpen((currentValue) => !currentValue)}
+                  onClick={toggleGameMenu}
                 >
                   ☰
                 </button>
@@ -1639,6 +1825,49 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 ) : null}
               </div>
             </div>
+
+            {quickShiftActive ? (
+              <section className="quick-status" data-testid="quick-status-panel">
+                <div className="quick-status__headline">
+                  <span className="intro-badge">快速单局</span>
+                  <div className="quick-status__copy">
+                    <strong>{quickStatusTitle}</strong>
+                    <p>{quickStatusCopy}</p>
+                  </div>
+                </div>
+                <div className="quick-status__chips">
+                  <div className="quick-status__chip">
+                    <span>下一轮换</span>
+                    <strong data-testid="quick-shift-countdown">
+                      {gameMenuOpen ? '暂停中' : formatQuickCountdown(quickShiftDisplayMs)}
+                    </strong>
+                  </div>
+                  <div className="quick-status__chip">
+                    <span>已轮换</span>
+                    <strong data-testid="quick-shift-count">{quickShiftCount}</strong>
+                  </div>
+                  <div className="quick-status__chip">
+                    <span>本局目标</span>
+                    <strong>清完 {quickTargetPairCount} 对</strong>
+                  </div>
+                  <div className="quick-status__chip">
+                    <span>当前剩余</span>
+                    <strong>{quickRemainingPairCount} 对</strong>
+                  </div>
+                </div>
+                <div className="quick-status__track" aria-hidden="true">
+                  <span
+                    className="quick-status__fill"
+                    style={{ width: `${quickShiftProgressRatio * 100}%` }}
+                  />
+                </div>
+                <span className="quick-status__rule">
+                  {quickShiftPhase === 'opening'
+                    ? '开局轮换不会立刻发生，先看牌，再开打。'
+                    : '桌面越清越快；顶部槽里有单张时，会多给一点补对子时间。'}
+                </span>
+              </section>
+            ) : null}
 
             <section className="tray-panel tray-panel--play" aria-label="顶部配对槽">
               <div
@@ -1771,7 +2000,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                   <p className="result-modal__role">
                     {state.status === 'won'
                       ? sessionMode === 'quick'
-                        ? '这局不写入主线，只帮你练节奏和看牌。'
+                        ? '这局不写入主线，只帮你练看牌、抢对子和收尾节奏。'
                         : '新的牌面已经被揭露出来，下一关会更复杂一点。'
                       : '这一局没有惩罚，整理一下顺序就能马上再试。'}
                   </p>
@@ -1788,7 +2017,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                     <span>本局分数 {currentScore}</span>
                     <span>
                       {sessionMode === 'quick'
-                        ? '本局不改变战役存档'
+                        ? `共经历 ${quickShiftCount} 次轮换 · 本局不改变战役存档`
                         : `本章累计 ${selectedChapterSummary?.earnedStars ?? 0} 星`}
                     </span>
                     <span>最佳次数 {currentLevelRecord?.bestSelectedCount ?? state.selectedCount}</span>
@@ -1797,6 +2026,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                     <span>匹配 {matchedPairs} 对</span>
                     <span>点击 {state.selectedCount} 次</span>
                     <span>用时 {formatDuration(completionDurationMs)}</span>
+                    <span>轮换 {quickShiftCount} 次</span>
                     <span>提示 {assistUsage.hintUsed} 次</span>
                     <span>撤销 {assistUsage.undoUsed} 次</span>
                   </div>
@@ -1830,7 +2060,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                   data-testid="retry-level-button"
                   onClick={retryCurrentLevel}
                 >
-                  重新整理
+                  {sessionMode === 'quick' ? '再来一局' : '重新整理'}
                 </button>
                 <button
                   type="button"

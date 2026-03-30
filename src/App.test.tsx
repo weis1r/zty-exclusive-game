@@ -1,13 +1,20 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GAME_CONFIG } from './game/config'
 import { createInitialGameState } from './game/engine'
 import { buildQuickShiftPlan } from './quickPlayRules'
+import {
+  createDefaultCampaignProgress,
+  recordLevelCompletion,
+  saveCampaignProgress,
+  setCurrentCampaignLevel,
+} from './game/storage'
 import { GameApp } from './App'
 import type {
   CampaignChapterDefinition,
   CampaignDefinition,
   LevelDefinition,
+  TileType,
 } from './game/types'
 
 function createLevel(
@@ -46,6 +53,20 @@ function createCampaign(
     chapters,
     levels,
   }
+}
+
+function createTileSet(count: number, typePool: TileType[] = ['ember']): LevelDefinition['tiles'] {
+  return Array.from({ length: count }, (_, index) => {
+    const type = typePool[index % typePool.length]
+
+    return {
+      id: `${type}-${index + 1}`,
+      type,
+      x: (index % 4) * 76,
+      y: Math.floor(index / 4) * 44,
+      layer: 0,
+    }
+  })
 }
 
 afterEach(() => {
@@ -203,6 +224,78 @@ describe('GameApp interactions', () => {
     expect(nextState.view).toBe('game')
     expect(nextState.campaign.sessionMode).toBe('quick')
     expect(nextState.campaign.quickRule).toBe('speed-shift')
+    expect(nextState.quickSession.phase).toBe('opening')
+    expect(nextState.quickSession.targetPairs).toBe(4)
+    expect(screen.getByTestId('quick-status-panel')).toHaveTextContent('开局观察期')
+  })
+
+  it('prefers a more comfortable unlocked level for quick play instead of the latest hard table', () => {
+    const campaign = createCampaign('app-campaign-quick-choice', [
+      createLevel('level-1', '热手局', 1, createTileSet(48, ['ember', 'leaf']), {
+        difficulty: 'easy',
+      }),
+      createLevel('level-2', '稳手局', 2, createTileSet(60, ['ember', 'leaf', 'bloom']), {
+        difficulty: 'normal',
+      }),
+      createLevel('level-3', '硬核局', 3, createTileSet(84, ['ember', 'leaf', 'bloom', 'bell']), {
+        difficulty: 'hard',
+      }),
+    ])
+    let progress = createDefaultCampaignProgress(campaign)
+
+    progress = recordLevelCompletion(
+      progress,
+      campaign,
+      { levelId: 'level-1', selectedCount: 48, completionMs: 12000 },
+      3,
+    )
+    progress = recordLevelCompletion(
+      progress,
+      campaign,
+      { levelId: 'level-2', selectedCount: 60, completionMs: 18000 },
+      3,
+    )
+    progress = setCurrentCampaignLevel(progress, campaign, 'level-3')
+    saveCampaignProgress(progress)
+
+    render(<GameApp campaign={campaign} />)
+
+    expect(screen.getByText('快速单局默认使用：稳手局')).toBeInTheDocument()
+  })
+
+  it('keeps a visible opening window before quick mode starts shifting', async () => {
+    vi.useFakeTimers()
+
+    const campaign = createCampaign('app-campaign-quick-window', [
+      createLevel('quick-level', '节奏关', 1, [
+        { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
+        { id: 'ember-2', type: 'ember', x: 80, y: 0, layer: 0 },
+        { id: 'leaf-1', type: 'leaf', x: 160, y: 0, layer: 0 },
+        { id: 'leaf-2', type: 'leaf', x: 240, y: 0, layer: 0 },
+        { id: 'bloom-1', type: 'bloom', x: 0, y: 100, layer: 0 },
+        { id: 'bloom-2', type: 'bloom', x: 80, y: 100, layer: 0 },
+        { id: 'bell-1', type: 'bell', x: 160, y: 100, layer: 0 },
+        { id: 'bell-2', type: 'bell', x: 240, y: 100, layer: 0 },
+      ]),
+    ])
+
+    render(<GameApp campaign={campaign} />)
+    fireEvent.click(screen.getByRole('button', { name: '快速单局' }))
+
+    const openingState = JSON.parse(window.render_game_to_text?.() ?? '{}')
+
+    expect(openingState.quickSession.phase).toBe('opening')
+    expect(openingState.quickSession.nextShiftInMs).toBeGreaterThanOrEqual(2300)
+    expect(screen.getByTestId('quick-shift-count')).toHaveTextContent('0')
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2450)
+    })
+    const cycledState = JSON.parse(window.render_game_to_text?.() ?? '{}')
+
+    expect(cycledState.quickSession.phase).toBe('cycling')
+    expect(cycledState.quickSession.shiftCount).toBe(1)
+    expect(screen.getByTestId('quick-shift-count')).toHaveTextContent('1')
   })
 
   it('builds a paired quick-shift plan from exposed tiles', () => {
