@@ -9,23 +9,33 @@ function createLevel(
   name: string,
   order: number,
   tiles: LevelDefinition['tiles'],
-  overrides?: Partial<LevelDefinition>,
+  overrides?: Partial<Omit<LevelDefinition, 'campaign'>> & {
+    campaign?: Partial<NonNullable<LevelDefinition['campaign']>>
+  },
 ): LevelDefinition {
+  const campaignOverride = overrides?.campaign ?? {}
+  const levelOverrides = overrides ?? {}
+
   return {
     id,
     name,
     boardWidth: GAME_CONFIG.boardWidth,
     boardHeight: GAME_CONFIG.boardHeight,
     difficulty: 'easy',
+    ...levelOverrides,
     campaign: {
-      order,
-      chapter: '测试章节',
-      summary: `${name} 说明`,
-      startingAssists: { hint: 1, undo: 1 },
-      ...(overrides?.campaign ?? {}),
+      order: campaignOverride.order ?? order,
+      chapterId: campaignOverride.chapterId ?? 'test-chapter',
+      chapter: campaignOverride.chapter ?? '测试章节',
+      summary: campaignOverride.summary ?? `${name} 说明`,
+      shapeId: campaignOverride.shapeId ?? 'ring',
+      shapeLabel: campaignOverride.shapeLabel ?? '圆环',
+      unlocksLevelId: campaignOverride.unlocksLevelId,
+      recommendedSelectionCount: campaignOverride.recommendedSelectionCount,
+      starSelectionThresholds: campaignOverride.starSelectionThresholds,
+      startingAssists: campaignOverride.startingAssists ?? { hint: 1, undo: 1 },
     },
     tiles,
-    ...overrides,
   }
 }
 
@@ -93,6 +103,60 @@ describe('GameApp three-screen flow', () => {
     expect(screen.queryByTestId('home-screen')).not.toBeInTheDocument()
   })
 
+  it('renders the current level shape theme on the home, game, and result screens', async () => {
+    const campaign = createCampaign('app-shape-theme', [
+      createLevel(
+        'shape-level-1',
+        '图形关',
+        1,
+        [
+          { id: 'shape-ember-1', type: 'ember', x: 40, y: 40, layer: 0 },
+          { id: 'shape-ember-2', type: 'ember', x: 140, y: 40, layer: 0 },
+        ],
+        {
+          campaign: {
+            shapeId: 'ring',
+            shapeLabel: '圆环',
+          },
+        },
+      ),
+      createLevel(
+        'shape-level-2',
+        '后续图形关',
+        2,
+        [
+          { id: 'shape-leaf-1', type: 'leaf', x: 40, y: 40, layer: 0 },
+          { id: 'shape-leaf-2', type: 'leaf', x: 140, y: 40, layer: 0 },
+        ],
+        {
+          campaign: {
+            shapeId: 'tripod',
+            shapeLabel: '三角架',
+          },
+        },
+      ),
+    ])
+
+    renderGame(campaign)
+
+    expect(screen.getAllByText('圆环').length).toBeGreaterThan(0)
+    expect(screen.queryByText('三角架')).not.toBeInTheDocument()
+
+    startFromHome()
+
+    expect(screen.getAllByText('圆环').length).toBeGreaterThan(0)
+
+    fireEvent.click(screen.getByTestId('tile-shape-ember-1'))
+    fireEvent.click(screen.getByTestId('tile-shape-ember-2'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('result-screen')).toBeInTheDocument()
+    })
+
+    expect(screen.getAllByText('圆环').length).toBeGreaterThan(0)
+    expect(screen.queryByText('三角架')).not.toBeInTheDocument()
+  })
+
   it('supports hint and undo inside the game screen', () => {
     const campaign = createCampaign('app-game-tools', [
       createLevel('tools-level', '工具关', 1, [
@@ -140,9 +204,16 @@ describe('GameApp three-screen flow', () => {
     fireEvent.click(screen.getByTestId('tile-burst-ember-2'))
 
     const trayGrid = screen.getByTestId('tray-grid')
+    const burstNodes = trayGrid.querySelectorAll('.tray-rack__burst')
 
     expect(trayGrid.childElementCount).toBe(GAME_CONFIG.trayCapacity)
-    expect(trayGrid.querySelectorAll('.tray-rack__burst')).toHaveLength(2)
+    expect(Array.from(trayGrid.children).every((node) => node.classList.contains('tray-rack__slot'))).toBe(
+      true,
+    )
+    expect(burstNodes).toHaveLength(2)
+    expect(
+      Array.from(burstNodes).every((node) => node.parentElement?.classList.contains('tray-rack__slot')),
+    ).toBe(true)
   })
 
   it('shows the result screen after victory and can continue to the next level', async () => {

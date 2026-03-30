@@ -1,4 +1,5 @@
 import type { LevelDefinition } from '../game/types'
+import { ShapeBadge } from '../components/ShapeBadge'
 
 interface HomeScreenProps {
   currentLevel: LevelDefinition
@@ -20,6 +21,8 @@ export function HomeScreen({
   onStart,
 }: HomeScreenProps) {
   const levelOrder = currentLevel.campaign?.order ?? 1
+  const shapeId = currentLevel.campaign?.shapeId
+  const shapeLabel = currentLevel.campaign?.shapeLabel
 
   return (
     <section className="home-screen" data-testid="home-screen">
@@ -55,12 +58,18 @@ export function HomeScreen({
         <div className="home-screen__logo">
           <span className="home-screen__logo-vita">Vita</span>
           <span className="home-screen__logo-mahjong">MAHJONG</span>
-          <span className="home-screen__logo-tile">叶</span>
+          <ShapeBadge
+            shapeId={shapeId}
+            shapeLabel={shapeLabel}
+            className="home-screen__logo-tile"
+            showLabel={false}
+          />
         </div>
       </div>
 
       <div className="home-screen__current">
         <p className="home-screen__eyebrow">当前可玩</p>
+        <ShapeBadge shapeId={shapeId} shapeLabel={shapeLabel} className="home-screen__shape-chip" />
         <h1>关卡 {levelOrder}</h1>
         <p className="home-screen__current-note">完成本关后自动解锁下一关</p>
       </div>

@@ -46,6 +46,25 @@ function getLevelUniqueTypeCount(level: LevelDefinition) {
   return new Set(level.tiles.map((tile) => tile.type)).size
 }
 
+function getOpeningSnapshot(level: LevelDefinition) {
+  const state = createInitialGameState(level, 'playing')
+  const exposedTiles = getExposedTiles(state)
+  const exposedTypeCounts = exposedTiles.reduce<Record<string, number>>((counts, tile) => {
+    counts[tile.type] = (counts[tile.type] ?? 0) + 1
+    return counts
+  }, {})
+  const safePairCount = Object.values(exposedTypeCounts).reduce(
+    (count, typeCount) => count + Math.floor(typeCount / GAME_CONFIG.matchCount),
+    0,
+  )
+
+  return {
+    exposedTiles,
+    exposedTypeCounts,
+    safePairCount,
+  }
+}
+
 function findGreedyWinningPath(level: LevelDefinition): string[] | null {
   const path: string[] = []
   let state = createInitialGameState(level, 'playing')
@@ -265,30 +284,33 @@ describe('game engine', () => {
     expect(CAMPAIGN_LEVELS).toHaveLength(20)
     expect(getCampaignChapters(CAMPAIGN)).toHaveLength(5)
     expect(DEFAULT_LEVEL.id).toBe('thorn-garden-01')
-    expect(DEFAULT_LEVEL.name).toBe('荆棘迷圃')
+    expect(DEFAULT_LEVEL.name).toBe('圆环阵列')
     expect(DEFAULT_LEVEL.difficulty).toBe('easy')
+    expect(DEFAULT_LEVEL.campaign?.shapeId).toBe('ring')
+    expect(DEFAULT_LEVEL.campaign?.shapeLabel).toBe('圆环')
     expect(DEFAULT_LEVEL.tiles).toHaveLength(144)
     expect(Object.values(tileCounts).every((count) => count % GAME_CONFIG.matchCount === 0)).toBe(true)
   })
 
-  it('starts the default level with a compact visible opening layer', () => {
+  it('starts the default level with an opening layer that stays within the target visibility range', () => {
     const state = createInitialGameState(DEFAULT_LEVEL, 'playing')
-    const exposedTiles = DEFAULT_LEVEL.tiles.filter((tile) => !isTileBlocked(tile.id, state, GAME_CONFIG))
+    const exposedTiles = DEFAULT_LEVEL.tiles.filter(
+      (tile) => !isTileBlocked(tile.id, state, GAME_CONFIG),
+    )
 
-    expect(exposedTiles).toHaveLength(26)
-    expect(DEFAULT_LEVEL.tiles.filter((tile) => isTileBlocked(tile.id, state, GAME_CONFIG))).toHaveLength(118)
+    expect(exposedTiles.length).toBeGreaterThanOrEqual(22)
+    expect(exposedTiles.length).toBeLessThanOrEqual(30)
+    expect(DEFAULT_LEVEL.tiles.filter((tile) => isTileBlocked(tile.id, state, GAME_CONFIG))).toHaveLength(
+      DEFAULT_LEVEL.tiles.length - exposedTiles.length,
+    )
   })
 
   it('starts the default level with four visible tile types and immediate safe pairs', () => {
-    const state = createInitialGameState(DEFAULT_LEVEL, 'playing')
-    const exposedTiles = getExposedTiles(state)
-    const exposedTypeCounts = exposedTiles.reduce<Record<string, number>>((counts, tile) => {
-      counts[tile.type] = (counts[tile.type] ?? 0) + 1
-      return counts
-    }, {})
+    const { exposedTypeCounts, safePairCount } = getOpeningSnapshot(DEFAULT_LEVEL)
 
     expect(Object.keys(exposedTypeCounts)).toHaveLength(4)
     expect(Object.values(exposedTypeCounts).every((count) => count >= 4)).toBe(true)
+    expect(safePairCount).toBeGreaterThanOrEqual(1)
   })
 
   it('ramps tile variety across the 20-level campaign', () => {
@@ -327,6 +349,18 @@ describe('game engine', () => {
 
     expect(winningPath).not.toBeNull()
     expect(winningPath).toHaveLength(DEFAULT_LEVEL.tiles.length)
+  })
+
+  it('keeps every shipped campaign level inside the target opening range with a safe adjacent pair', () => {
+    CAMPAIGN_LEVELS.forEach((level) => {
+      const { exposedTiles, safePairCount } = getOpeningSnapshot(level)
+
+      expect(level.campaign?.shapeId).toBeTruthy()
+      expect(level.campaign?.shapeLabel).toBeTruthy()
+      expect(exposedTiles.length).toBeGreaterThanOrEqual(22)
+      expect(exposedTiles.length).toBeLessThanOrEqual(30)
+      expect(safePairCount).toBeGreaterThanOrEqual(1)
+    })
   })
 
   it('keeps every shipped campaign level solvable with safe adjacent-pair play', () => {

@@ -27,6 +27,8 @@ export interface CampaignLevelMeta {
   chapterId?: string
   chapter: string
   summary: string
+  shapeId?: string
+  shapeLabel?: string
   unlocksLevelId?: string
   recommendedSelectionCount?: number
   // Thresholds are max picks for 3-star / 2-star / 1-star.

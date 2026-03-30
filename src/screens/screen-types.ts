@@ -4,6 +4,8 @@ export interface RoundSummary {
   outcome: 'won' | 'lost'
   levelId: string
   levelOrder: number
+  shapeId: string | null
+  shapeLabel: string | null
   nextLevelId: string | null
   nextLevelOrder: number | null
   selectedCount: number

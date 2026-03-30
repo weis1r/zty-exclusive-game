@@ -1,4 +1,5 @@
 import type { RoundSummary } from './screen-types'
+import { ShapeBadge } from '../components/ShapeBadge'
 
 interface ResultScreenProps {
   summary: RoundSummary
@@ -34,6 +35,11 @@ export function ResultScreen({ summary, onPrimary, onSecondary }: ResultScreenPr
       <div className="result-screen__glow" aria-hidden="true" />
 
       <article className="result-card">
+        <ShapeBadge
+          shapeId={summary.shapeId}
+          shapeLabel={summary.shapeLabel}
+          className="result-card__shape"
+        />
         <p className="result-card__eyebrow">{isWon ? '关卡完成' : '本关失败'}</p>
         <h2 className="result-card__title">{isWon ? '本局通关' : '再试一次'}</h2>
         <p className="result-card__subtitle">关卡 {summary.levelOrder}</p>

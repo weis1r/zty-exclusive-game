@@ -503,3 +503,72 @@ Verification
 Open notes
 - 当前“错落感”是渲染层微偏移，不改真实解法几何；这是为了同时满足美术自然度和 20 关可解性约束。
 - Playwright 验证时，部分被上层压住中心点的可点击牌需要点击其实际露出区域，这是叠牌玩法本身允许的情况；主流程中的可点牌与托盘行为都已复测通过。
+
+---
+
+Task
+- 用户新需求: 实现「Vita 托盘消除修复 + 20 关物理图形轮廓重构计划」，保留三屏流转与核心玩法，修托盘爆发 bug，并把 20 关改成独立 shape 主题布局。
+
+What changed
+- `src/game/levelLayouts.ts`
+  - 新增 20 个 `shapeId` 对应的布局生成器，改成“稳定 36 槽骨架 + 轻量 shape 变形 + 4 次重复”。
+  - 调整各 shape 的 warp 强度，确保 20 关开局露牌数全部落在 `22-30`。
+  - 保留棋盘尺寸 `356 x 450`，让 Vita 游戏页里棋盘占比更满。
+- `src/game/levels.ts`
+  - 20 关名称改为几何 / 轨迹 / 物理器材主题版本。
+  - 5 章标题与摘要改成“几何基座 -> 几何变奏 -> 轨迹实验 -> 力学装置 -> 光学与场”。
+  - 为每关注入 `shapeId` / `shapeLabel`。
+  - 把第 6 关的 `fillerPattern` 改为 `braid`、第 20 关改为 `orbit`，修复 greedy 可解性。
+- `src/game/types.ts`
+  - `CampaignLevelMeta` 增加 `shapeId` / `shapeLabel`。
+- `src/screens/screen-types.ts`
+  - `RoundSummary` 增加 `shapeId` / `shapeLabel`，让结果页离开对局后仍能显示当前关主题。
+- `src/game/shapeThemes.ts`
+  - 新增 shape 徽章主题表，统一 badge / accent / ink / glow。
+- `src/components/ShapeBadge.tsx`
+  - 新增通用 shape 徽章组件，首页 / 游戏页 / 结果页共用。
+- `src/screens/HomeScreen.tsx`
+  - 首页当前关 CTA、Logo 角标接入 shape 装饰。
+- `src/screens/GameScreen.tsx`
+  - 游戏页 HUD 接入 shape chip。
+  - 顶部托盘继续把爆发动画渲染在单个槽位内部。
+- `src/screens/ResultScreen.tsx`
+  - 结果页接入 shape 徽章，成功 / 失败都能对上当前关主题。
+- `src/App.tsx`
+  - `render_game_to_text` 在 `home / game / result` 三个状态里都输出 shape 信息。
+  - 结果页 summary 写入当前关的 `shapeId` / `shapeLabel`。
+- `src/App.css`
+  - 补充 shared shape badge 样式。
+  - 托盘槽位改为 `position: relative` + `overflow: hidden`，爆发动画限定在槽位内，防止横向拉成整条大牌。
+- 测试
+  - `src/game/engine.test.ts`
+    - 改成新主题名称与 shape 元数据断言。
+    - 开局露牌从固定值改为 `22-30` 范围断言。
+    - 新增 20 关开局范围 + 安全相邻对约束。
+  - `src/App.test.tsx`
+    - 新增三屏 shape 装饰渲染断言。
+    - 托盘爆发节点必须是 `.tray-rack__slot` 子节点，且 `tray-grid` 仍固定 `4` 槽。
+
+Verification
+- 自动化:
+  - `npm run test -- --run`
+  - `npm run lint`
+  - `npm run build`
+- 量化探测:
+  - 20 关全部满足开局露牌 `22-30`
+  - 20 关全部至少存在 `1` 组立即可走的安全相邻对
+  - 20 关全部通过当前 greedy solver 可解性验证
+- Playwright / 截图产物:
+  - `output/web-game/vita-shape-home-20260331/shot-0.png`
+  - `output/web-game/vita-shape-game-20260331/shot-0.png`
+  - `output/manual-shape-samples-20260331/level-1.png`
+  - `output/manual-shape-samples-20260331/level-8.png`
+  - `output/manual-shape-samples-20260331/level-12.png`
+  - `output/manual-shape-samples-20260331/level-16.png`
+  - `output/manual-shape-samples-20260331/level-20.png`
+- 备注:
+  - 用户已明确说明“UI 相关不用验证”，所以本轮收口以自动化和局部截图抽检为主，没有继续做结果页全流程的人工 UI 走查。
+
+Open notes
+- 当前 shape 轮廓是“稳定骨架上做轻量变形”，优先保证可解性和露牌范围；如果后续还想把某一关图形再做得更夸张，建议逐关调而不是统一加大 warp。
+- 顶部托盘大牌 bug 的 CSS 约束已经加上，后续如果再改托盘 DOM 结构，需要保住“爆发节点永远是槽位子节点”这条规则。

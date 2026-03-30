@@ -61,6 +61,37 @@
   border: 0;
 }
 
+.shape-badge {
+  --shape-accent: rgba(255, 225, 150, 0.9);
+  --shape-ink: #6d4c0a;
+  --shape-glow: rgba(255, 225, 150, 0.28);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  padding: 8px 12px;
+  border-radius: 999px;
+  color: var(--shape-ink);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 241, 0.92), rgba(243, 234, 212, 0.92)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32), transparent);
+  box-shadow:
+    0 8px 18px var(--shape-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.54);
+}
+
+.shape-badge__glyph {
+  font-size: 1.18rem;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.shape-badge__label {
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
 .icon-button,
 .primary-button,
 .secondary-button,
@@ -331,18 +362,21 @@
   right: 18px;
   width: 60px;
   height: 76px;
+  padding: 0;
   border-radius: 14px;
-  display: grid;
+  display: inline-grid;
   place-items: center;
-  font-size: 2.1rem;
-  font-weight: 900;
-  color: #146d4d;
-  background:
-    linear-gradient(180deg, rgba(255, 254, 247, 0.98), rgba(240, 231, 211, 0.98)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.42), transparent);
   border: 4px solid rgba(136, 73, 36, 0.88);
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.24);
   transform: rotate(12deg);
+}
+
+.home-screen__logo-tile .shape-badge__glyph {
+  font-size: 2rem;
+}
+
+.home-screen__logo-tile .shape-badge__label {
+  display: none;
 }
 
 .home-screen__current {
@@ -363,6 +397,10 @@
   letter-spacing: 0.26em;
   text-transform: uppercase;
   opacity: 0.82;
+}
+
+.home-screen__shape-chip {
+  justify-self: center;
 }
 
 .home-screen__current h1 {
@@ -453,6 +491,25 @@
   font-weight: 700;
 }
 
+.game-screen__meta {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.game-screen__shape-chip {
+  padding: 6px 10px;
+  background: rgba(255, 248, 222, 0.9);
+}
+
+.game-screen__shape-chip .shape-badge__glyph {
+  font-size: 0.92rem;
+}
+
+.game-screen__shape-chip .shape-badge__label {
+  font-size: 0.72rem;
+}
+
 .tray-rack {
   padding: 14px 14px 12px;
   border-radius: 22px;
@@ -498,6 +555,12 @@
   min-height: 72px;
 }
 
+.tray-rack__slot {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+}
+
 .tray-rack__tile,
 .tray-rack__placeholder {
   width: 100%;
@@ -516,6 +579,12 @@
   display: grid;
   place-items: stretch;
   pointer-events: none;
+  z-index: 2;
+}
+
+.tray-rack__tile {
+  position: relative;
+  z-index: 1;
 }
 
 .tray-rack__tile .tile-piece,
@@ -542,6 +611,32 @@
   transform-origin: top left;
   border-radius: 22px;
   background: linear-gradient(180deg, rgba(16, 114, 84, 0.95), rgba(8, 92, 68, 0.98));
+}
+
+.game-board__watermark {
+  position: absolute;
+  inset: 18px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.game-board__watermark-badge {
+  padding: 18px 22px;
+  gap: 12px;
+  opacity: 0.15;
+  transform: rotate(-8deg);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
+.game-board__watermark-badge .shape-badge__glyph {
+  font-size: 4rem;
+}
+
+.game-board__watermark-badge .shape-badge__label {
+  font-size: 1.3rem;
 }
 
 .board-tile {
@@ -674,6 +769,11 @@
   letter-spacing: 0.28em;
   text-transform: uppercase;
   color: rgba(255, 234, 184, 0.72);
+}
+
+.result-card__shape {
+  margin: 0 auto 14px;
+  padding: 10px 14px;
 }
 
 .result-card__title {

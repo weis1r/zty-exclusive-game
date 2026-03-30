@@ -8,6 +8,7 @@ import {
 } from '../game/engine'
 import type { GameConfig, GameState, LevelDefinition, TileDefinition } from '../game/types'
 import { TilePiece } from '../components/TilePiece'
+import { ShapeBadge } from '../components/ShapeBadge'
 
 interface GameScreenProps {
   currentLevel: LevelDefinition
@@ -64,6 +65,8 @@ export function GameScreen({
   const boardScale = Math.min(1, 352 / boardWidth)
   const isResolvingMatch = state.matchBursts.length > 0
   const remainingCount = activeBoardTiles.length
+  const shapeId = currentLevel.campaign?.shapeId
+  const shapeLabel = currentLevel.campaign?.shapeLabel
   const hintSuggestion = getHintSuggestion(state, config)
   const canUseHintButton =
     state.status === 'playing' &&
@@ -109,7 +112,10 @@ export function GameScreen({
           </div>
         </div>
 
-        <div className="game-screen__progress">/ {totalLevels}</div>
+        <div className="game-screen__meta">
+          <ShapeBadge shapeId={shapeId} shapeLabel={shapeLabel} className="game-screen__shape-chip" />
+          <div className="game-screen__progress">/ {totalLevels}</div>
+        </div>
       </header>
 
       <section className="tray-rack">
@@ -165,6 +171,14 @@ export function GameScreen({
         }
       >
         <div className="game-board">
+          <div className="game-board__watermark" aria-hidden="true">
+            <ShapeBadge
+              shapeId={shapeId}
+              shapeLabel={shapeLabel}
+              className="game-board__watermark-badge"
+            />
+          </div>
+
           {activeBoardTiles.map((tile) => {
             const theme = TILE_THEMES[tile.type]
             const blocked = blockedTileIds.has(tile.id)
