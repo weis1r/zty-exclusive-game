@@ -1,3 +1,5 @@
+import type { LossReason } from '../game/types'
+
 export type AppScreen = 'home' | 'game' | 'result'
 
 export interface RoundSummary {
@@ -15,4 +17,6 @@ export interface RoundSummary {
   durationMs: number | null
   hintUsed: number
   undoUsed: number
+  remainingTimerMs: number
+  lossReason: LossReason | null
 }

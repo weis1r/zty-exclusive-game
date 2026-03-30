@@ -26,6 +26,10 @@ export function ResultScreen({ summary, onPrimary, onSecondary }: ResultScreenPr
       ? `关卡 ${summary.nextLevelOrder}`
       : '再来一次'
     : '重试当前关卡'
+  const failureMessage =
+    summary.lossReason === 'time-up'
+      ? '倒计时结束了，节奏再快一点就能过关。'
+      : '顶部四槽已经卡住，整理顺序后再来一局。'
 
   return (
     <section
@@ -70,12 +74,12 @@ export function ResultScreen({ summary, onPrimary, onSecondary }: ResultScreenPr
         {isWon ? (
           <p className="result-card__message">
             {summary.nextLevelOrder
-              ? `下一关已解锁，继续前往关卡 ${summary.nextLevelOrder}。`
+              ? `下一关已解锁，继续前往关卡 ${summary.nextLevelOrder}，并获得 +45 秒与 +4 次提示。`
               : '最后一关已完成，还可以再挑战一次。'}
           </p>
         ) : (
           <p className="result-card__message">
-            顶部四槽已经卡住，整理顺序后再来一局。
+            {failureMessage}
           </p>
         )}
 

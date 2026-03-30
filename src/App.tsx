@@ -27,7 +27,14 @@ import {
   savePreferences,
   setCurrentCampaignLevel,
 } from './game/storage'
-import type { CampaignDefinition, CampaignProgress, GameConfig, GameState, LevelDefinition } from './game/types'
+import type {
+  CampaignDefinition,
+  CampaignProgress,
+  GameConfig,
+  GameState,
+  LevelDefinition,
+  LossReason,
+} from './game/types'
 import { HomeScreen } from './screens/HomeScreen'
 import { GameScreen } from './screens/GameScreen'
 import { ResultScreen } from './screens/ResultScreen'
@@ -41,12 +48,12 @@ declare global {
 }
 
 type GameAction =
-  | { type: 'start-level'; level: LevelDefinition }
+  | { type: 'start-level'; level: LevelDefinition; timerRemainingMs: number; hintCharges: number }
   | { type: 'pick'; tileId: string }
   | { type: 'move-tray-to-pocket'; trayIndex: number }
   | { type: 'release-pocket'; pocketIndex: number }
   | { type: 'advance-time'; ms: number }
-  | { type: 'restart' }
+  | { type: 'restart'; timerRemainingMs: number; hintCharges: number }
   | { type: 'clear-match-bursts' }
   | { type: 'clear-hint' }
   | { type: 'use-hint' }
@@ -62,11 +69,19 @@ interface SessionAssistUsage {
   undoUsed: number
 }
 
+const SESSION_START_TIMER_MS = 90_000
+const SESSION_BONUS_TIMER_MS = 45_000
+const SESSION_START_HINTS = 8
+const SESSION_BONUS_HINTS = 4
+
 function createGameReducer(level: LevelDefinition, config: GameConfig) {
   return (state: GameState, action: GameAction): GameState => {
     switch (action.type) {
       case 'start-level':
-        return startGame(action.level)
+        return startGame(action.level, {
+          assistChargesOverride: { hint: action.hintCharges },
+          timerRemainingMs: action.timerRemainingMs,
+        })
       case 'pick':
         return pickTile(state, action.tileId, level, config)
       case 'move-tray-to-pocket':
@@ -76,7 +91,10 @@ function createGameReducer(level: LevelDefinition, config: GameConfig) {
       case 'advance-time':
         return advanceGameTime(state, action.ms)
       case 'restart':
-        return restartGame(level)
+        return restartGame(level, {
+          assistChargesOverride: { hint: action.hintCharges },
+          timerRemainingMs: action.timerRemainingMs,
+        })
       case 'clear-match-bursts':
         return clearResolvedMatches(state)
       case 'clear-hint':
@@ -120,6 +138,8 @@ function buildRoundSummary(
   selectedCount: number,
   durationMs: number | null,
   assistUsage: SessionAssistUsage,
+  remainingTimerMs: number,
+  lossReason: LossReason | null,
 ): RoundSummary {
   return {
     outcome,
@@ -136,6 +156,8 @@ function buildRoundSummary(
     durationMs,
     hintUsed: assistUsage.hintUsed,
     undoUsed: assistUsage.undoUsed,
+    remainingTimerMs,
+    lossReason,
   }
 }
 
@@ -164,7 +186,11 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   const [state, dispatch] = useReducer(
     createGameReducer(currentLevel, config),
     currentLevel,
-    (level) => createInitialGameState(level),
+    (level) =>
+      createInitialGameState(level, 'idle', {
+        assistChargesOverride: { hint: SESSION_START_HINTS },
+        timerRemainingMs: SESSION_START_TIMER_MS,
+      }),
   )
 
   useEffect(() => {
@@ -232,7 +258,10 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
         chapterRuleId: currentLevel.campaign?.chapterRuleId ?? null,
         chapterRuleLabel: currentLevel.campaign?.chapterRuleLabel ?? null,
         status: state.status,
+        settingsOpen,
         elapsedMs: state.elapsedMs,
+        timerRemainingMs: state.timerRemainingMs,
+        lossReason: state.lossReason,
         selectedCount: state.selectedCount,
         trayTiles: state.trayTiles.map((trayTile) => trayTile.type),
         orbitPockets: state.orbitPockets.map((pocketTile) => pocketTile?.type ?? null),
@@ -304,7 +333,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
       return
     }
 
-    const settleKey = `${state.levelId}:${state.status}:${state.selectedCount}:${startedAt ?? 'na'}`
+    const settleKey = `${state.levelId}:${state.status}:${state.lossReason ?? 'none'}:${state.selectedCount}:${state.timerRemainingMs}:${startedAt ?? 'na'}`
 
     if (settledRoundRef.current === settleKey) {
       return
@@ -322,6 +351,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
       state.selectedCount,
       durationMs,
       assistUsage,
+      state.timerRemainingMs,
+      state.lossReason,
     )
     const timer = window.setTimeout(() => {
       if (state.status === 'won') {
@@ -342,6 +373,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
       }
 
       startTransition(() => {
+        setSettingsOpen(false)
         setRoundSummary(summary)
         setScreen('result')
       })
@@ -350,9 +382,27 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     return () => {
       window.clearTimeout(timer)
     }
-  }, [assistUsage, campaign, currentLevel, screen, startedAt, state.levelId, state.selectedCount, state.status])
+  }, [
+    assistUsage,
+    campaign,
+    currentLevel,
+    screen,
+    startedAt,
+    state.levelId,
+    state.lossReason,
+    state.selectedCount,
+    state.status,
+    state.timerRemainingMs,
+  ])
 
-  function startLevel(levelId: string, allowLocked = false) {
+  function startLevel(
+    levelId: string,
+    allowLocked = false,
+    nextSessionState: {
+      timerRemainingMs?: number
+      hintCharges?: number
+    } = {},
+  ) {
     const nextLevel = getCampaignLevelById(levelId, campaign)
     const isUnlocked = campaignProgress.levelRecords[levelId]?.unlocked ?? false
 
@@ -373,11 +423,17 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     setCampaignProgress((currentProgress) =>
       setCurrentCampaignLevel(currentProgress, campaign, levelId),
     )
-    dispatch({ type: 'start-level', level: nextLevel })
+    dispatch({
+      type: 'start-level',
+      level: nextLevel,
+      timerRemainingMs: nextSessionState.timerRemainingMs ?? SESSION_START_TIMER_MS,
+      hintCharges: nextSessionState.hintCharges ?? SESSION_START_HINTS,
+    })
   }
 
   function retryCurrentLevel() {
     settledRoundRef.current = null
+    setSettingsOpen(false)
     setRoundSummary(null)
     setAssistUsage({
       hintUsed: 0,
@@ -385,7 +441,11 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     })
     setStartedAt(Date.now())
     setScreen('game')
-    dispatch({ type: 'restart' })
+    dispatch({
+      type: 'restart',
+      timerRemainingMs: SESSION_START_TIMER_MS,
+      hintCharges: SESSION_START_HINTS,
+    })
   }
 
   function goHome() {
@@ -449,7 +509,10 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     }
 
     if (roundSummary.outcome === 'won' && roundSummary.nextLevelId) {
-      startLevel(roundSummary.nextLevelId, true)
+      startLevel(roundSummary.nextLevelId, true, {
+        timerRemainingMs: state.timerRemainingMs + SESSION_BONUS_TIMER_MS,
+        hintCharges: state.assistCharges.hint + SESSION_BONUS_HINTS,
+      })
       return
     }
 
@@ -481,10 +544,15 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
             totalLevels={campaignLevels.length}
             config={config}
             state={state}
+            soundEnabled={soundEnabled}
+            settingsOpen={settingsOpen}
             onBack={handleBackFromGame}
             onPick={(tileId) => dispatch({ type: 'pick', tileId })}
             onMoveTrayToPocket={(trayIndex) => dispatch({ type: 'move-tray-to-pocket', trayIndex })}
             onReleasePocket={(pocketIndex) => dispatch({ type: 'release-pocket', pocketIndex })}
+            onToggleSettings={() => setSettingsOpen((currentValue) => !currentValue)}
+            onToggleSound={() => setSoundEnabled((currentValue) => !currentValue)}
+            onResetProgress={handleResetProgress}
             onUseHint={handleUseHint}
             onUseUndo={handleUseUndo}
           />

@@ -20,10 +20,15 @@ interface GameScreenProps {
   totalLevels: number
   config: GameConfig
   state: GameState
+  soundEnabled: boolean
+  settingsOpen: boolean
   onBack: () => void
   onPick: (tileId: string) => void
   onMoveTrayToPocket: (trayIndex: number) => void
   onReleasePocket: (pocketIndex: number) => void
+  onToggleSettings: () => void
+  onToggleSound: () => void
+  onResetProgress: () => void
   onUseHint: () => void
   onUseUndo: () => void
 }
@@ -48,15 +53,28 @@ function formatShiftCountdown(msUntilSelectable: number) {
   return `${Math.max(1, Math.ceil(msUntilSelectable / 1000))}秒`
 }
 
+function formatRoundCountdown(msRemaining: number) {
+  const totalSeconds = Math.max(0, Math.ceil(msRemaining / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
 export function GameScreen({
   currentLevel,
   totalLevels,
   config,
   state,
+  soundEnabled,
+  settingsOpen,
   onBack,
   onPick,
   onMoveTrayToPocket,
   onReleasePocket,
+  onToggleSettings,
+  onToggleSound,
+  onResetProgress,
   onUseHint,
   onUseUndo,
 }: GameScreenProps) {
@@ -82,6 +100,7 @@ export function GameScreen({
   const shapeLabel = currentLevel.campaign?.shapeLabel
   const tileCount = currentLevel.campaign?.tileCount ?? currentLevel.tiles.length
   const chapterRuleLabel = currentLevel.campaign?.chapterRuleLabel ?? '经典四槽'
+  const timerUrgent = state.timerRemainingMs <= 15_000
   const hintSuggestion = getHintSuggestion(state, currentLevel, config)
   const canUseHintButton =
     state.status === 'playing' &&
@@ -119,6 +138,12 @@ export function GameScreen({
               {state.selectedCount} 次
             </strong>
           </div>
+          <div className={`game-stat game-stat--timer${timerUrgent ? ' game-stat--timer-urgent' : ''}`}>
+            <span className="game-stat__label">剩时</span>
+            <strong className="game-stat__value" data-testid="countdown-remaining">
+              {formatRoundCountdown(state.timerRemainingMs)}
+            </strong>
+          </div>
           <div className="game-stat">
             <span className="game-stat__label">块数</span>
             <strong className="game-stat__value" data-testid="game-tile-count">
@@ -134,11 +159,50 @@ export function GameScreen({
         </div>
 
         <div className="game-screen__meta">
-          <ShapeBadge shapeId={shapeId} shapeLabel={shapeLabel} className="game-screen__shape-chip" />
-          <span className="hud-chip" data-testid="game-rule-chip">
-            {chapterRuleLabel}
-          </span>
-          <div className="game-screen__progress">/ {totalLevels}</div>
+          <div className="game-screen__meta-top">
+            <ShapeBadge
+              shapeId={shapeId}
+              shapeLabel={shapeLabel}
+              className="game-screen__shape-chip"
+            />
+            <div className="game-screen__settings">
+              <button
+                type="button"
+                className="icon-button icon-button--wood"
+                data-testid="game-settings-button"
+                aria-label="打开局内设置"
+                aria-expanded={settingsOpen}
+                onClick={onToggleSettings}
+              >
+                <span className="icon-button__glyph">⚙</span>
+              </button>
+              {settingsOpen ? (
+                <div className="settings-popover settings-popover--game">
+                  <button
+                    type="button"
+                    className="settings-popover__action"
+                    onClick={onToggleSound}
+                  >
+                    音效 {soundEnabled ? '开' : '关'}
+                  </button>
+                  <button
+                    type="button"
+                    className="settings-popover__action settings-popover__action--danger"
+                    data-testid="game-reset-progress-button"
+                    onClick={onResetProgress}
+                  >
+                    清空关卡进度
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <div className="game-screen__meta-bottom">
+            <span className="hud-chip" data-testid="game-rule-chip">
+              {chapterRuleLabel}
+            </span>
+            <div className="game-screen__progress">/ {totalLevels}</div>
+          </div>
         </div>
       </header>
 
@@ -273,6 +337,7 @@ export function GameScreen({
             const hinted = state.lastHintTileId === tile.id
             const cycleState = getTileCycleState(tile, state.elapsedMs)
             const locked = !blocked && !isTileSelectableInCurrentCycle(tile, state.elapsedMs)
+            const faceDown = blocked || locked
 
             return (
               <button
@@ -285,12 +350,12 @@ export function GameScreen({
                 }${cycleState?.group === 'shift-b' ? ' board-tile--reverse' : ''}`}
                 style={getTileStyle(tile)}
                 onClick={() => onPick(tile.id)}
-                aria-label={theme.title}
+                aria-label={faceDown ? '未揭开的牌' : theme.title}
                 data-testid={`tile-${tile.id}`}
                 disabled={blocked || locked || isResolvingMatch || state.status !== 'playing'}
               >
-                <TilePiece theme={theme} />
-                {cycleState ? (
+                <TilePiece theme={theme} faceDown={faceDown} />
+                {cycleState && !blocked ? (
                   <span className={`board-tile__shift-state board-tile__shift-state--${cycleState.group}`}>
                     {cycleState.selectable
                       ? '可点'
@@ -311,7 +376,6 @@ export function GameScreen({
           disabled={!canUseHintButton}
           onClick={onUseHint}
         >
-          <span className="tool-button__icon">灯</span>
           <span className="tool-button__text">提示</span>
           <span className="tool-button__count">{state.assistCharges.hint}</span>
         </button>
@@ -322,7 +386,6 @@ export function GameScreen({
           disabled={!canUseUndoButton}
           onClick={onUseUndo}
         >
-          <span className="tool-button__icon">回</span>
           <span className="tool-button__text">撤销</span>
           <span className="tool-button__count">{state.assistCharges.undo}</span>
         </button>

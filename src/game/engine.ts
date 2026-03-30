@@ -9,6 +9,7 @@ import type {
   GameStatus,
   HintSuggestion,
   LevelDefinition,
+  LossReason,
   MatchBurst,
   OrbitPocket,
   TileDefinition,
@@ -49,6 +50,11 @@ interface ChapterRuleSettings {
 
 interface ExposedTileState extends BoardTileState {
   currentType: TileType
+}
+
+interface GameStartOptions {
+  assistChargesOverride?: Partial<AssistCharges>
+  timerRemainingMs?: number
 }
 
 const CHAPTER_RULE_SETTINGS: Record<ChapterRuleId, ChapterRuleSettings> = {
@@ -193,10 +199,14 @@ function resolveTrayMatches(
   }
 }
 
-function getStartingAssistCharges(level: LevelDefinition): AssistCharges {
+function getStartingAssistCharges(
+  level: LevelDefinition,
+  assistChargesOverride?: Partial<AssistCharges>,
+): AssistCharges {
   return {
     undo: level.campaign?.startingAssists?.undo ?? 1,
     hint: level.campaign?.startingAssists?.hint ?? 2,
+    ...assistChargesOverride,
   }
 }
 
@@ -212,6 +222,8 @@ function createSnapshot(state: GameState): GameStateSnapshot {
     matchBursts: cloneMatchBursts(state.matchBursts),
     lastHintTileId: state.lastHintTileId,
     elapsedMs: state.elapsedMs,
+    timerRemainingMs: state.timerRemainingMs,
+    lossReason: state.lossReason,
   }
 }
 
@@ -349,16 +361,25 @@ function resolveGameStatus(
   remainingBoardTileCount: number,
   trayTiles: TrayTile[],
   trayCapacity: number,
-): GameStatus {
+): { status: GameStatus; lossReason: LossReason | null } {
   if (remainingBoardTileCount === 0 && trayTiles.length === 0) {
-    return 'won'
+    return {
+      status: 'won',
+      lossReason: null,
+    }
   }
 
   if (remainingBoardTileCount === 0 || trayTiles.length >= trayCapacity) {
-    return 'lost'
+    return {
+      status: 'lost',
+      lossReason: 'stuck',
+    }
   }
 
-  return 'playing'
+  return {
+    status: 'playing',
+    lossReason: null,
+  }
 }
 
 function insertPocketTileIntoTray(
@@ -372,6 +393,7 @@ function insertPocketTileIntoTray(
 export function createInitialGameState(
   level: LevelDefinition,
   status: GameStatus = 'idle',
+  options: GameStartOptions = {},
 ): GameState {
   return {
     levelId: level.id,
@@ -383,19 +405,21 @@ export function createInitialGameState(
     removedCount: 0,
     resolvedMatchIds: [],
     matchBursts: [],
-    assistCharges: getStartingAssistCharges(level),
+    assistCharges: getStartingAssistCharges(level, options.assistChargesOverride),
     lastHintTileId: null,
     elapsedMs: 0,
+    timerRemainingMs: options.timerRemainingMs ?? 90_000,
+    lossReason: null,
     history: [],
   }
 }
 
-export function startGame(level: LevelDefinition): GameState {
-  return createInitialGameState(level, 'playing')
+export function startGame(level: LevelDefinition, options: GameStartOptions = {}): GameState {
+  return createInitialGameState(level, 'playing', options)
 }
 
-export function restartGame(level: LevelDefinition): GameState {
-  return createInitialGameState(level, 'playing')
+export function restartGame(level: LevelDefinition, options: GameStartOptions = {}): GameState {
+  return createInitialGameState(level, 'playing', options)
 }
 
 export function clearResolvedMatches(state: GameState): GameState {
@@ -426,9 +450,23 @@ export function advanceGameTime(state: GameState, elapsedMsDelta: number): GameS
     return state
   }
 
+  const nextTimerRemainingMs = Math.max(0, state.timerRemainingMs - elapsedMsDelta)
+
+  if (nextTimerRemainingMs === 0) {
+    return {
+      ...state,
+      elapsedMs: state.elapsedMs + elapsedMsDelta,
+      timerRemainingMs: 0,
+      status: 'lost',
+      lossReason: 'time-up',
+      lastHintTileId: null,
+    }
+  }
+
   return {
     ...state,
     elapsedMs: state.elapsedMs + elapsedMsDelta,
+    timerRemainingMs: nextTimerRemainingMs,
   }
 }
 
@@ -678,7 +716,7 @@ export function releasePocketToTray(
     ...state,
     trayTiles: nextTrayTiles,
     orbitPockets: nextOrbitPockets,
-    status: resolveGameStatus(remainingBoardTileCount, nextTrayTiles, config.trayCapacity),
+    ...resolveGameStatus(remainingBoardTileCount, nextTrayTiles, config.trayCapacity),
     removedCount: state.removedCount + matchBursts.length,
     resolvedMatchIds: matchBursts.map((burst) => burst.id),
     matchBursts,
@@ -736,7 +774,7 @@ export function pickTile(
     boardTiles: nextBoardTiles,
     trayTiles: nextTrayTiles,
     orbitPockets: cloneOrbitPockets(state.orbitPockets),
-    status: resolveGameStatus(
+    ...resolveGameStatus(
       remainingBoardTileCount,
       nextTrayTiles,
       config.trayCapacity,
@@ -747,6 +785,7 @@ export function pickTile(
     matchBursts,
     lastHintTileId: null,
     elapsedMs: state.elapsedMs,
+    timerRemainingMs: state.timerRemainingMs,
     history: pushHistory(state),
   }
 }

@@ -655,3 +655,47 @@ Verification
 Open notes
 - `src/game/types.ts` 里仍保留了 `chapterRuleId` / `chapterRuleLabel` / `orbitPockets` 这些兼容字段，但当前玩法已统一按经典四槽运行。
 - 章节文案里还有一部分旧的中途实验描述没有完全重写；不影响当前实际规则和界面交互，如果下一轮继续 polish，可以再把文案统一到“经典四槽 + 错峰变换块”版本。
+
+---
+
+Task
+- 用户新需求: 单局增加倒计时失败条件，初始 1 分 30 秒，每过 1 关加 45 秒；提示按钮去掉“灯”字，初始 8 次，每过 1 关加 4 次可累加；提示高亮做得更明显。
+
+What changed
+- `src/game/types.ts`
+  - `GameState` / `GameStateSnapshot` 新增 `timerRemainingMs` 与 `lossReason`
+  - 增加 `LossReason = 'stuck' | 'time-up'`
+- `src/game/engine.ts`
+  - `startGame` / `restartGame` 支持注入本局剩余时间与提示次数
+  - `advanceGameTime` 现在会同步扣减倒计时，归零时直接以 `time-up` 判负
+  - 托盘卡死失败与超时失败都会写入明确 `lossReason`
+  - 历史快照也保留剩余时间，方便撤销逻辑维持一致时间轴
+- `src/App.tsx`
+  - 新增单局会话规则常量:
+    - 开局 `90s`
+    - 通关后 `+45s`
+    - 开局提示 `8`
+    - 通关后 `+4`
+  - 进入下一关时会把上一关剩余时间与剩余提示叠加带入下一关
+  - 重试当前关则回到新单局的 `90s + 8` 提示
+  - `render_game_to_text` 追加输出 `timerRemainingMs` 与 `lossReason`
+- `src/screens/GameScreen.tsx`
+  - HUD 新增倒计时展示
+  - 倒计时低于 `15s` 时切到更紧张的高亮样式
+  - 底部按钮移除了“灯 / 回”单字，只保留 `提示 / 撤销`
+  - 提示次数直接展示为当前可用剩余次数
+- `src/App.css`
+  - 顶部 HUD 改成 5 格统计布局，适配倒计时
+  - 倒计时增加普通 / 紧急两档视觉
+  - 提示牌高亮改为更强的描边、外发光和“推荐”浮标
+  - 保留本轮已有的盖牌视觉修改，不做回退
+- `src/screens/ResultScreen.tsx`
+  - 失败文案会区分“卡槽失败”和“倒计时结束”
+  - 胜利文案会提示“下一关 +45 秒 / +4 次提示”
+
+Verification
+- 按用户要求，这一轮没有再跑自动测试，由用户手动体验验证。
+
+Open notes
+- 当前“跨关累计”的只有倒计时和提示次数；撤销次数仍按关卡默认值重开，不做跨关累计。
+- 这轮只继续处理 `src/` 范围内的玩法改动，工作区里其它构建产物已按用户要求忽略。

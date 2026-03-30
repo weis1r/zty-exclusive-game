@@ -90,6 +90,7 @@ export interface MatchBurst {
 }
 
 export type GameStatus = 'idle' | 'playing' | 'won' | 'lost'
+export type LossReason = 'stuck' | 'time-up'
 
 export interface GameStateSnapshot {
   boardTiles: BoardTileState[]
@@ -102,6 +103,8 @@ export interface GameStateSnapshot {
   matchBursts: MatchBurst[]
   lastHintTileId: string | null
   elapsedMs: number
+  timerRemainingMs: number
+  lossReason: LossReason | null
 }
 
 export interface GameState {
@@ -117,6 +120,8 @@ export interface GameState {
   assistCharges: AssistCharges
   lastHintTileId: string | null
   elapsedMs: number
+  timerRemainingMs: number
+  lossReason: LossReason | null
   history: GameStateSnapshot[]
 }
 
