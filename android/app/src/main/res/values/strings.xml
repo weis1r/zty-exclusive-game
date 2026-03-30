@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="app_name">朱天宇专属游戏</string>
+  <string name="android_loading_title">正在装载花园远征...</string>
+  <string name="android_loading_subtitle">首次启动会从 App 内置资源载入游戏。</string>
+  <string name="android_error_title">游戏暂时没打开</string>
+  <string name="android_error_body">你可以点一下重新加载，或者稍后再试。</string>
+  <string name="android_error_detail">错误详情：%1$s</string>
+  <string name="android_retry">重新加载</string>
+</resources>

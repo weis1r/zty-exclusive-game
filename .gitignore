@@ -9,10 +9,18 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-android
 coverage
 dist-ssr
 output
 *.local
+android/.gradle
+android/build
+android/app/build
+android/local.properties
+android/captures
+*.apk
+*.aab
 
 # Editor directories and files
 .vscode/*

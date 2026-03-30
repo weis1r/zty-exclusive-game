@@ -58,12 +58,10 @@ describe('GameApp interactions', () => {
       createLevel('level-1', '起步关', 1, [
         { id: 'ember-1', type: 'ember', x: 40, y: 40, layer: 0 },
         { id: 'ember-2', type: 'ember', x: 140, y: 40, layer: 0 },
-        { id: 'ember-3', type: 'ember', x: 240, y: 40, layer: 0 },
       ]),
       createLevel('level-2', '锁定关', 2, [
         { id: 'leaf-1', type: 'leaf', x: 40, y: 40, layer: 0 },
         { id: 'leaf-2', type: 'leaf', x: 140, y: 40, layer: 0 },
-        { id: 'leaf-3', type: 'leaf', x: 240, y: 40, layer: 0 },
       ]),
     ])
 
@@ -104,7 +102,6 @@ describe('GameApp interactions', () => {
           [
             { id: 'ember-1', type: 'ember', x: 40, y: 40, layer: 0 },
             { id: 'ember-2', type: 'ember', x: 140, y: 40, layer: 0 },
-            { id: 'ember-3', type: 'ember', x: 240, y: 40, layer: 0 },
           ],
           {
             campaign: { order: 1, chapterId: chapterA.id, chapter: chapterA.title, summary: 'a-1' },
@@ -117,7 +114,6 @@ describe('GameApp interactions', () => {
           [
             { id: 'leaf-1', type: 'leaf', x: 40, y: 40, layer: 0 },
             { id: 'leaf-2', type: 'leaf', x: 140, y: 40, layer: 0 },
-            { id: 'leaf-3', type: 'leaf', x: 240, y: 40, layer: 0 },
           ],
           {
             campaign: { order: 2, chapterId: chapterA.id, chapter: chapterA.title, summary: 'a-2' },
@@ -130,7 +126,6 @@ describe('GameApp interactions', () => {
           [
             { id: 'bloom-1', type: 'bloom', x: 40, y: 40, layer: 0 },
             { id: 'bloom-2', type: 'bloom', x: 140, y: 40, layer: 0 },
-            { id: 'bloom-3', type: 'bloom', x: 240, y: 40, layer: 0 },
           ],
           {
             campaign: { order: 3, chapterId: chapterB.id, chapter: chapterB.title, summary: 'b-1' },
@@ -155,8 +150,8 @@ describe('GameApp interactions', () => {
       createLevel('tools-level', '工具关', 1, [
         { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
         { id: 'ember-2', type: 'ember', x: 80, y: 0, layer: 0 },
-        { id: 'ember-3', type: 'ember', x: 160, y: 0, layer: 0 },
-        { id: 'leaf-1', type: 'leaf', x: 0, y: 100, layer: 0 },
+        { id: 'leaf-1', type: 'leaf', x: 160, y: 0, layer: 0 },
+        { id: 'leaf-2', type: 'leaf', x: 240, y: 0, layer: 0 },
       ]),
     ])
 
@@ -188,12 +183,10 @@ describe('GameApp interactions', () => {
       createLevel('level-1', '通关关', 1, [
         { id: 'ember-1', type: 'ember', x: 40, y: 40, layer: 0 },
         { id: 'ember-2', type: 'ember', x: 140, y: 40, layer: 0 },
-        { id: 'ember-3', type: 'ember', x: 240, y: 40, layer: 0 },
       ]),
       createLevel('level-2', '后续关', 2, [
         { id: 'leaf-1', type: 'leaf', x: 40, y: 40, layer: 0 },
         { id: 'leaf-2', type: 'leaf', x: 140, y: 40, layer: 0 },
-        { id: 'leaf-3', type: 'leaf', x: 240, y: 40, layer: 0 },
       ]),
     ])
 
@@ -202,7 +195,6 @@ describe('GameApp interactions', () => {
     fireEvent.click(screen.getByTestId('start-level-btn-level-1'))
     fireEvent.click(screen.getByTestId('tile-ember-1'))
     fireEvent.click(screen.getByTestId('tile-ember-2'))
-    fireEvent.click(screen.getByTestId('tile-ember-3'))
 
     await waitFor(() => {
       expect(screen.getByTestId('result-modal')).toBeInTheDocument()
@@ -226,9 +218,6 @@ describe('GameApp interactions', () => {
         { id: 'bloom-1', type: 'bloom', x: 160, y: 0, layer: 0 },
         { id: 'bell-1', type: 'bell', x: 240, y: 0, layer: 0 },
         { id: 'cloud-1', type: 'cloud', x: 0, y: 100, layer: 0 },
-        { id: 'shell-1', type: 'shell', x: 80, y: 100, layer: 0 },
-        { id: 'berry-1', type: 'berry', x: 160, y: 100, layer: 0 },
-        { id: 'wave-1', type: 'wave', x: 240, y: 100, layer: 0 },
       ]),
     ])
 
@@ -236,21 +225,13 @@ describe('GameApp interactions', () => {
 
     fireEvent.click(screen.getByTestId('start-level-btn-lose-level'))
 
-    ;[
-      'ember-1',
-      'leaf-1',
-      'bloom-1',
-      'bell-1',
-      'cloud-1',
-      'shell-1',
-      'berry-1',
-    ].forEach((tileId) => {
+    ;['ember-1', 'leaf-1', 'bloom-1', 'bell-1'].forEach((tileId) => {
       fireEvent.click(screen.getByTestId(`tile-${tileId}`))
     })
 
     await waitFor(() => {
       expect(screen.getByTestId('result-modal')).toBeInTheDocument()
-      expect(screen.getByText('收集槽卡住了')).toBeInTheDocument()
+      expect(screen.getByText('顶部配对槽卡住了')).toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByTestId('retry-level-button'))
@@ -258,7 +239,7 @@ describe('GameApp interactions', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('result-modal')).not.toBeInTheDocument()
       expect(screen.getByTestId('selected-count')).toHaveTextContent('0 次')
-      expect(screen.getByTestId('remaining-count')).toHaveTextContent('8 块')
+      expect(screen.getByTestId('remaining-count')).toHaveTextContent('5 块')
     })
   })
 })

@@ -889,7 +889,7 @@ function getRecommendedGoal(level: LevelDefinition) {
     return '稳扎稳打'
   }
 
-  return `推荐 ${level.campaign.recommendedSelectionCount} 步内`
+  return `推荐 ${level.campaign.recommendedSelectionCount} 次内`
 }
 
 function getChapterSummaries(
@@ -1073,6 +1073,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
           difficulty: currentLevel.difficulty ?? null,
         },
         status: state.status,
+        matchCount: config.matchCount,
         selectedCount: state.selectedCount,
         removedCount: state.removedCount,
         trayCapacity: config.trayCapacity,
@@ -1320,8 +1321,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 <p className="intro-title">{GAME_TITLE}</p>
                 <p className="intro-subtitle">{WORLD_SUBTITLE}</p>
                 <p className="intro-copy">
-                  这是一份为朱天宇打造的专属闯关版本，已经扩展到 {campaignLevels.length} 关与{' '}
-                  {chapterCount} 个章节。沿着角色章节推进、收集星级，并利用提示和撤销稳住节奏。
+                  这是一份为朱天宇打造的专属闯关版本，已经切成 Vita Mahjong 风格的二消玩法，当前包含{' '}
+                  {campaignLevels.length} 关与 {chapterCount} 个章节。沿着角色章节推进、收集星级，并在顶部四格配对槽里稳住节奏。
                 </p>
 
                 <div className="intro-card__meta">
@@ -1479,8 +1480,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
             ) : null}
 
             <div className="intro-rules">
-              <div className="rule-chip">专属角色领路</div>
-              <div className="rule-chip">六关双章节</div>
+              <div className="rule-chip">Vita 风格二消</div>
+              <div className="rule-chip">顶部四格配对槽</div>
               <div className="rule-chip">提示 / 撤销道具</div>
             </div>
 
@@ -1498,7 +1499,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 onClick={() => startLevel(selectedLevelId)}
                 disabled={!(campaignProgress.levelRecords[selectedLevelId]?.unlocked ?? false)}
               >
-                整理这一片花圃
+                进入当前关卡
               </button>
             </div>
 
@@ -1578,13 +1579,13 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                                 }}
                                 disabled={!isUnlocked}
                               >
-                                {isUnlocked ? '整理这一片花圃' : '等待解锁'}
+                                {isUnlocked ? '进入这一局' : '等待解锁'}
                               </button>
                               <span className="level-card__status">
                                 {isCurrent
                                   ? '当前推进中'
                                   : levelRecord?.bestSelectedCount !== null
-                                    ? `最佳 ${levelRecord.bestSelectedCount} 步`
+                                    ? `最佳 ${levelRecord.bestSelectedCount} 次`
                                     : '尚未通关'}
                               </span>
                             </div>
@@ -1635,7 +1636,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 </div>
               ) : null}
               <div className="status-chip">
-                <span className="status-label">已选</span>
+                <span className="status-label">已点</span>
                 <strong data-testid="selected-count">{state.selectedCount} 次</strong>
               </div>
               <div className="status-chip status-chip--warning">
@@ -1644,112 +1645,18 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
               </div>
             </div>
 
-            <section className="toolbelt">
-              <div className="toolbelt__header">
-                <div>
-                  <p className="eyebrow">局内辅助</p>
-                  <h2>稳住节奏</h2>
-                </div>
-                <p className="toolbelt__tip">
-                  {state.lastHintTileId ? '提示已标记一张推荐砖块。' : '提示只高亮，不会自动帮你点。'}
-                </p>
-              </div>
-
-              <div className="toolbelt__actions">
-                <button
-                  type="button"
-                  className="tool-button tool-button--hint"
-                  data-testid="hint-button"
-                  disabled={!canUseHintButton}
-                  onClick={handleUseHint}
-                >
-                  <span className="tool-button__icon">灯</span>
-                  <span className="tool-button__label">提示</span>
-                  <span className="tool-button__count">{state.assistCharges.hint}</span>
-                </button>
-                <button
-                  type="button"
-                  className="tool-button tool-button--undo"
-                  data-testid="undo-button"
-                  disabled={!canUseUndo(state)}
-                  onClick={handleUseUndo}
-                >
-                  <span className="tool-button__icon">回</span>
-                  <span className="tool-button__label">撤销</span>
-                  <span className="tool-button__count">{state.assistCharges.undo}</span>
-                </button>
-                <button
-                  type="button"
-                  className="tool-button tool-button--map"
-                  onClick={returnToCampaign}
-                >
-                  <span className="tool-button__icon">图</span>
-                  <span className="tool-button__label">回到花园地图</span>
-                </button>
-              </div>
-            </section>
-
-            <div
-              className="board-shell"
-              style={
-                {
-                  '--board-width': `${config.boardWidth}px`,
-                  '--board-height': `${config.boardHeight}px`,
-                  '--board-scale': config.boardScaleBase,
-                  ...getChapterThemeStyle(selectedChapterTheme),
-                } as CSSProperties
-              }
-            >
-              <img
-                src={selectedChapterTheme.sticker}
-                alt=""
-                aria-hidden="true"
-                className="board-shell__sticker"
-              />
-              <div className="board-surface">
-                {activeBoardTiles.map((tile) => {
-                  const theme = TILE_THEMES[tile.type]
-                  const blocked = blockedTileIds.has(tile.id)
-                  const hinted = state.lastHintTileId === tile.id
-
-                  return (
-                    <button
-                      key={tile.id}
-                      type="button"
-                      className={`tile-card${blocked ? ' is-blocked' : ''}${
-                        hinted ? ' is-hinted' : ''
-                      }`}
-                      style={getTileStyle(tile)}
-                      onClick={() => dispatch({ type: 'pick', tileId: tile.id })}
-                      aria-label={theme.title}
-                      data-testid={`tile-${tile.id}`}
-                      disabled={blocked || isResolvingMatch || state.status !== 'playing'}
-                    >
-                      <span className="tile-card__shadow" aria-hidden="true" />
-                      <span className="tile-card__face">
-                        <span className="tile-card__shine" aria-hidden="true" />
-                        <TileMascot
-                          tileType={tile.type}
-                          theme={theme}
-                          mood={blocked ? 'board-blocked' : hinted ? 'board-hinted' : 'board-active'}
-                        />
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <section className="tray-panel">
+            <section className="tray-panel tray-panel--top">
               <div className="tray-panel__heading">
                 <div>
-                  <p className="eyebrow">收集槽</p>
+                  <p className="eyebrow">顶部配对槽</p>
                   <h2>
                     {state.trayTiles.length}/{config.trayCapacity}
                   </h2>
                 </div>
                 <p className="tray-tip">
-                  {isResolvingMatch ? '正在结算三消...' : '同类砖块会自动相邻整理'}
+                  {isResolvingMatch
+                    ? '正在结算二消...'
+                    : `同类头像两张即消，最多只留 ${config.trayCapacity} 张`}
                 </p>
               </div>
 
@@ -1811,7 +1718,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                           '--tile-pattern': TILE_THEMES[burst.type].pattern,
                         } as CSSProperties
                       }
-                      >
+                    >
                       <TileMascot
                         tileType={burst.type}
                         theme={TILE_THEMES[burst.type]}
@@ -1821,6 +1728,104 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                     </span>
                   </div>
                 ))}
+              </div>
+            </section>
+
+            <div
+              className="board-shell"
+              style={
+                {
+                  '--board-width': `${config.boardWidth}px`,
+                  '--board-height': `${config.boardHeight}px`,
+                  '--board-scale': config.boardScaleBase,
+                  ...getChapterThemeStyle(selectedChapterTheme),
+                } as CSSProperties
+              }
+            >
+              <img
+                src={selectedChapterTheme.sticker}
+                alt=""
+                aria-hidden="true"
+                className="board-shell__sticker"
+              />
+              <div className="board-surface">
+                {activeBoardTiles.map((tile) => {
+                  const theme = TILE_THEMES[tile.type]
+                  const blocked = blockedTileIds.has(tile.id)
+                  const hinted = state.lastHintTileId === tile.id
+
+                  return (
+                    <button
+                      key={tile.id}
+                      type="button"
+                      className={`tile-card${blocked ? ' is-blocked' : ''}${
+                        hinted ? ' is-hinted' : ''
+                      }`}
+                      style={getTileStyle(tile)}
+                      onClick={() => dispatch({ type: 'pick', tileId: tile.id })}
+                      aria-label={theme.title}
+                      data-testid={`tile-${tile.id}`}
+                      disabled={blocked || isResolvingMatch || state.status !== 'playing'}
+                    >
+                      <span className="tile-card__shadow" aria-hidden="true" />
+                      <span className="tile-card__face">
+                        <span className="tile-card__shine" aria-hidden="true" />
+                        <TileMascot
+                          tileType={tile.type}
+                          theme={theme}
+                          mood={blocked ? 'board-blocked' : hinted ? 'board-hinted' : 'board-active'}
+                        />
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <section className="toolbelt">
+              <div className="toolbelt__header">
+                <div>
+                  <p className="eyebrow">局内辅助</p>
+                  <h2>四槽节奏</h2>
+                </div>
+                <p className="toolbelt__tip">
+                  {state.lastHintTileId
+                    ? '提示已圈出一张更适合现在凑对的头像。'
+                    : '提示只会高亮推荐头像，不会替你自动点击。'}
+                </p>
+              </div>
+
+              <div className="toolbelt__actions">
+                <button
+                  type="button"
+                  className="tool-button tool-button--hint"
+                  data-testid="hint-button"
+                  disabled={!canUseHintButton}
+                  onClick={handleUseHint}
+                >
+                  <span className="tool-button__icon">灯</span>
+                  <span className="tool-button__label">提示</span>
+                  <span className="tool-button__count">{state.assistCharges.hint}</span>
+                </button>
+                <button
+                  type="button"
+                  className="tool-button tool-button--undo"
+                  data-testid="undo-button"
+                  disabled={!canUseUndo(state)}
+                  onClick={handleUseUndo}
+                >
+                  <span className="tool-button__icon">回</span>
+                  <span className="tool-button__label">撤销</span>
+                  <span className="tool-button__count">{state.assistCharges.undo}</span>
+                </button>
+                <button
+                  type="button"
+                  className="tool-button tool-button--map"
+                  onClick={returnToCampaign}
+                >
+                  <span className="tool-button__icon">图</span>
+                  <span className="tool-button__label">回到花园地图</span>
+                </button>
               </div>
             </section>
           </section>
@@ -1855,7 +1860,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 </div>
                 <div className="result-modal__heading">
                   <p className="eyebrow">{state.status === 'won' ? '通关结算' : '本关失败'}</p>
-                  <h2>{state.status === 'won' ? '花园整理完成' : '收集槽卡住了'}</h2>
+                  <h2>{state.status === 'won' ? '本局二消完成' : '顶部配对槽卡住了'}</h2>
                   <p className="result-modal__role">{selectedChapterTheme.roleName} 正在陪你冲刺下一站</p>
                 </div>
               </div>
@@ -1868,7 +1873,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                   <div className="result-modal__reward">
                     <span>本章累计 {selectedChapterSummary?.earnedStars ?? 0} 星</span>
                     <span>
-                      最佳步数 {currentLevelRecord?.bestSelectedCount ?? state.selectedCount}
+                      最佳次数 {currentLevelRecord?.bestSelectedCount ?? state.selectedCount}
                     </span>
                   </div>
                   <div className="result-modal__summary">
@@ -1886,7 +1891,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
               ) : (
                 <p>
                   你还剩 {state.assistCharges.undo} 次撤销、{state.assistCharges.hint} 次提示，
-                  可以直接重试，也可以回到地图再选关。
+                  可以继续重试，也可以回到地图换一关。
                 </p>
               )}
 

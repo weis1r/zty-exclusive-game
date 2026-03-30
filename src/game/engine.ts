@@ -275,9 +275,14 @@ export function getHintSuggestion(
   }
 
   const trayTypeCounts = getTrayTypeCounts(state.trayTiles)
+  const exposedTypeCounts = new Map<TileType, number>()
+
+  exposedTiles.forEach((tile) => {
+    exposedTypeCounts.set(tile.type, (exposedTypeCounts.get(tile.type) ?? 0) + 1)
+  })
 
   const readyMatchTile = exposedTiles.find(
-    (tile) => (trayTypeCounts.get(tile.type) ?? 0) >= 2,
+    (tile) => (trayTypeCounts.get(tile.type) ?? 0) >= config.matchCount - 1,
   )
 
   if (readyMatchTile) {
@@ -289,7 +294,9 @@ export function getHintSuggestion(
   }
 
   const traySetupTile = exposedTiles.find(
-    (tile) => (trayTypeCounts.get(tile.type) ?? 0) >= 1,
+    (tile) =>
+      (trayTypeCounts.get(tile.type) ?? 0) === 0 &&
+      (exposedTypeCounts.get(tile.type) ?? 0) >= config.matchCount,
   )
 
   if (traySetupTile) {
@@ -299,12 +306,6 @@ export function getHintSuggestion(
       reason: 'tray-setup',
     }
   }
-
-  const exposedTypeCounts = new Map<TileType, number>()
-
-  exposedTiles.forEach((tile) => {
-    exposedTypeCounts.set(tile.type, (exposedTypeCounts.get(tile.type) ?? 0) + 1)
-  })
 
   let bestType: TileType | null = null
   let bestCount = -1
@@ -395,8 +396,10 @@ export function pickTile(
 
   let nextStatus: GameStatus = 'playing'
 
-  if (remainingBoardTileCount === 0) {
+  if (remainingBoardTileCount === 0 && nextTrayTiles.length === 0) {
     nextStatus = 'won'
+  } else if (remainingBoardTileCount === 0) {
+    nextStatus = 'lost'
   } else if (nextTrayTiles.length >= config.trayCapacity) {
     nextStatus = 'lost'
   }
