@@ -167,14 +167,16 @@ export interface LevelCompletionStats {
 }
 
 export interface TileTheme {
-  label: string
   title: string
-  glyphKind: string
-  badgeFamily: 'animal' | 'dots' | 'bamboo' | 'symbol'
+  glyphKind: TileType
   ink: string
   accentInk: string
+  detailInk: string
+  outline: string
   shadowGlow: string
   facePattern: string
+  badgeShape: 'spark' | 'leaf' | 'petal' | 'gem' | 'crest'
+  badgeInk: string
 }
 
 export interface GameConfig {

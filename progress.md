@@ -142,6 +142,54 @@ Remaining risk
 ---
 
 Task
+- 用户新需求: 在 `codex/app-pixel-board-refresh` 上把棋盘收成同尺寸单舞台、牌面去文字并改成 20 类纯图形 icon，同时把 20 关从 4 套复用模板改成 20 个独立轮廓堆叠。
+
+What changed
+- `src/game/types.ts`
+  - `TileTheme` 改成纯展示字段：加入 `detailInk / outline / badgeShape / badgeInk`，移除旧的文字角标依赖。
+- `src/game/config.ts`
+  - 20 个 `TileType` 全部重映射成无文字图形主题。
+  - 统一为低噪音厚描边图形砖，去掉旧的麻将字牌/圈条语义。
+- `src/App.tsx`
+  - 旧的 `renderMahjongGlyph` 整体替换为 20 套纯图形 SVG 渲染。
+  - `CardFace` 改成图章角标 + 中心 icon，不再在牌面上放任何文字。
+  - `getTileStyle / getTrayStyle` 接上新的主题描边、细节色和图章色。
+- `src/App.css`
+  - `board-shell` / `board-surface` 改成同尺寸单舞台，不再用 padding 缩出内层小棋盘。
+  - 棋盘玻璃感和内缩边框进一步弱化，保留轻桌布纹理。
+  - 牌面样式改成更干净的实体砖，和新的纯图形 face 对齐。
+- `src/game/levels.ts`
+  - 用 silhouette mask + 分层高度生成器替换旧的 `stack48/60/72/84` 四模板复用。
+  - 现在 20 关分别对应 `circle / triangle / diamond / star-cross / wave / arrow / hourglass / crown / vase / tree / house / bridge / lantern / butterfly / sailboat / umbrella / castle / rocket / key / dragon-head`。
+  - 每关仍保留原有 `48 / 60 / 72 / 84` 曲线、`2 消`、`4 槽`、章节结构和可解性。
+- `src/game/engine.test.ts`
+  - 更新默认关开局暴露断言以匹配新的轮廓布局。
+  - 新增“20 关都是独立布局签名”的回归测试。
+
+Verification
+- 自动化:
+  - `npm run test -- --run`
+  - `npm run lint`
+  - `npm run build`
+- 本地预览:
+  - `http://127.0.0.1:4185/`
+- 实机截图:
+  - `output/board-refresh-home.png`
+  - `output/board-refresh-level-1.png`
+  - `output/level-4.png`
+  - `output/level-20.png`
+- 已确认:
+  - 第 1 关和第 20 关牌面都已经无文字，只保留图形 icon。
+  - 棋盘容器收成单舞台后，`board-shell` 与 `board-surface` 视觉同尺寸。
+  - 后期关卡轮廓与前期关卡不再复用同一套模板。
+
+Open notes
+- 轮廓现在已经是 20 套独立布局，但如果后面还想继续做“更像真实堆叠物体”的感觉，可以下一轮继续调 `CELL_STEP_X / CELL_STEP_Y / LAYER_OFFSETS`，把部分关卡做得更散、更横向铺满。
+- 目前 campaign 页还是沿用已有信息架构；如果下一轮重点转回首页体验，可以再把章节卡和结果页一起统一到这套无文字 icon 语言。
+
+---
+
+Task
 - 用户新需求: 参考 Vita Mahjong 的单局语言，把局内重构成更清楚的扑克牌/麻将牌桌体验，并补上快速单局入口；另外要求先切到独立分支，避免和并行任务冲突。
 
 Branch

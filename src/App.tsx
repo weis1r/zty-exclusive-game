@@ -8,6 +8,7 @@ import {
   type CSSProperties,
 } from 'react'
 import './App.css'
+import { buildQuickShiftPlan } from './quickPlayRules'
 import { GAME_CONFIG, TILE_THEMES } from './game/config'
 import {
   canUseUndo,
@@ -71,6 +72,7 @@ type GameAction =
   | { type: 'start-level'; level: LevelDefinition }
   | { type: 'pick'; tileId: string }
   | { type: 'restart' }
+  | { type: 'quick-shift'; typeMap: Record<string, TileType> }
   | { type: 'clear-match-bursts' }
   | { type: 'clear-hint' }
   | { type: 'use-hint' }
@@ -109,6 +111,8 @@ const WORLD_SUBTITLE = '花园远征'
 const CHAPTER_TILE_STEPS = [48, 60, 72, 84]
 const AUTO_HINT_IDLE_MS = 7000
 const AUTO_HINT_FLASH_MS = 1700
+const QUICK_SHIFT_INTERVAL_MS = 1000
+const QUICK_SHIFT_FLASH_MS = 560
 
 type UiSoundKind = 'pick' | 'hint' | 'undo' | 'match' | 'win' | 'lose'
 
@@ -264,6 +268,30 @@ function createGameReducer(level: LevelDefinition, config: GameConfig) {
         return pickTile(state, action.tileId, level, config)
       case 'restart':
         return restartGame(level)
+      case 'quick-shift': {
+        const nextTileIds = Object.keys(action.typeMap)
+
+        if (nextTileIds.length === 0 || state.status !== 'playing') {
+          return state
+        }
+
+        return {
+          ...state,
+          boardTiles: state.boardTiles.map((tile) => {
+            const nextType = action.typeMap[tile.id]
+
+            if (!nextType || tile.removed) {
+              return tile
+            }
+
+            return {
+              ...tile,
+              type: nextType,
+            }
+          }),
+          lastHintTileId: null,
+        }
+      }
       case 'clear-match-bursts':
         return clearResolvedMatches(state)
       case 'clear-hint':
@@ -374,229 +402,257 @@ function getChapterThemeStyle(theme: ChapterSurfaceTheme) {
   } as CSSProperties
 }
 
-function renderDot(cx: number, cy: number, ink: string, accentInk: string) {
-  return (
-    <g>
-      <circle cx={cx} cy={cy} r="11" fill={ink} />
-      <circle cx={cx - 1.5} cy={cy - 1.5} r="5.4" fill="#f8f3e9" />
-      <circle cx={cx + 3} cy={cy + 3} r="4.7" fill={accentInk} />
-    </g>
-  )
-}
+function renderCornerBadge(theme: TileTheme) {
+  const fill = theme.badgeInk
+  const stroke = theme.detailInk
 
-function renderStick(x: number, y: number, ink: string, accentInk: string) {
-  return (
-    <g transform={`translate(${x} ${y})`}>
-      <rect x="0" y="2" width="10" height="30" rx="5" fill={ink} />
-      <rect x="2.4" y="5" width="5.2" height="10" rx="2.6" fill={accentInk} opacity="0.38" />
-      <rect x="2.4" y="18" width="5.2" height="10" rx="2.6" fill={accentInk} opacity="0.38" />
-    </g>
-  )
-}
-
-function renderBambooCluster(kind: TileTheme['glyphKind'], ink: string, accentInk: string) {
-  const positions =
-    kind === 'bamboo-2'
-      ? [
-          [33, 30],
-          [53, 30],
-        ]
-      : kind === 'bamboo-3'
-        ? [
-            [24, 26],
-            [43, 26],
-            [62, 26],
-          ]
-        : kind === 'bamboo-4'
-          ? [
-              [28, 20],
-              [48, 20],
-              [28, 54],
-              [48, 54],
-            ]
-          : [
-              [18, 18],
-              [38, 18],
-              [58, 18],
-              [28, 52],
-              [48, 52],
-            ]
-
-  return positions.map(([x, y], index) => (
-    <g key={`${kind}-${index}`}>{renderStick(x, y, ink, accentInk)}</g>
-  ))
-}
-
-function renderDotCluster(kind: TileTheme['glyphKind'], ink: string, accentInk: string) {
-  const positions =
-    kind === 'dots-2'
-      ? [
-          [34, 34],
-          [62, 62],
-        ]
-      : kind === 'dots-4'
-        ? [
-            [33, 30],
-            [62, 30],
-            [33, 62],
-            [62, 62],
-          ]
-        : kind === 'dots-5'
-          ? [
-              [28, 28],
-              [58, 28],
-              [43, 46],
-              [28, 66],
-              [58, 66],
-            ]
-          : [
-              [26, 24],
-              [56, 24],
-              [26, 46],
-              [56, 46],
-              [26, 68],
-              [56, 68],
-            ]
-
-  return positions.map(([x, y], index) => (
-    <g key={`${kind}-${index}`}>{renderDot(x, y, ink, accentInk)}</g>
-  ))
-}
-
-function renderMahjongGlyph(theme: TileTheme) {
-  const ink = theme.ink
-  const accentInk = theme.accentInk
-
-  switch (theme.glyphKind) {
-    case 'dog':
+  switch (theme.badgeShape) {
+    case 'spark':
+      return (
+        <path
+          d="M12 2 14.4 8.3 21 12l-6.6 3.7L12 22l-2.4-6.3L3 12l6.6-3.7L12 2Z"
+          fill={fill}
+          stroke={stroke}
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+        />
+      )
+    case 'leaf':
       return (
         <>
-          <path d="M24 76V32l16 10 16-8 12 12v30H24Z" fill={ink} />
-          <path d="M36 42 30 30 22 42M56 38l8-12 10 14" fill={ink} />
-          <circle cx="47" cy="54" r="2.6" fill="#f7f2e8" />
-          <path d="M52 64c8 2 12 5 16 12" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
-          <path d="M34 69h18" fill="none" stroke={accentInk} strokeWidth="3.8" strokeLinecap="round" />
+          <path
+            d="M20 5c-6.7 1.1-12 5.8-13.8 12.5 3.8 1.7 8.9.8 12.1-2.3C20.9 12.8 21.7 8.8 20 5Z"
+            fill={fill}
+            stroke={stroke}
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+          />
+          <path d="M8 16c2.7-2.4 5.8-4.5 9.2-6.1" fill="none" stroke={stroke} strokeWidth="1.2" strokeLinecap="round" />
         </>
       )
-    case 'cat':
+    case 'petal':
       return (
         <>
-          <path d="M30 74c0-20 9-34 22-34 12 0 20 11 20 28 0 11-5 18-16 18H30Z" fill={ink} />
-          <path d="M35 44 28 28 40 38M58 36l10-12 6 18" fill={ink} />
-          <circle cx="48" cy="52" r="2.4" fill="#f7f2e8" />
-          <path d="M60 74c8 0 13-7 13-16 0-10-6-18-14-22" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
-          <path d="M26 55h12M60 55h12" fill="none" stroke={accentInk} strokeWidth="2.8" strokeLinecap="round" />
+          <circle cx="8" cy="9" r="4" fill={fill} />
+          <circle cx="16" cy="9" r="4" fill={fill} />
+          <circle cx="8" cy="15" r="4" fill={fill} />
+          <circle cx="16" cy="15" r="4" fill={fill} />
+          <circle cx="12" cy="12" r="2.4" fill={stroke} />
         </>
       )
-    case 'fish':
+    case 'crest':
       return (
-        <>
-          <path d="M20 57c10-18 24-24 40-20 12 3 18 10 20 19-7 1-11 4-15 12-7 14-22 18-45 11 4-5 6-11 6-18s-2-10-6-14Z" fill={ink} />
-          <path d="m20 57-8-15 2 30 8-15ZM54 45c6 4 10 6 14 7-5 2-9 5-12 10" fill={accentInk} />
-          <circle cx="49" cy="52" r="3" fill="#f7f2e8" />
-        </>
+        <path
+          d="M12 3 19 6v6.5c0 3.8-2.4 7.1-7 8.9-4.6-1.8-7-5.1-7-8.9V6l7-3Z"
+          fill={fill}
+          stroke={stroke}
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+        />
       )
-    case 'dragon':
-      return (
-        <>
-          <path d="M21 65c8-23 21-36 41-36 10 0 18 4 24 11-10 2-16 8-18 17 0 12-8 20-23 24-8 2-16 0-24-4 7-2 11-6 13-12H21Z" fill={ink} />
-          <path d="M54 37c6 2 11 5 15 11M33 70c8 0 14-3 19-8" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
-          <circle cx="54" cy="48" r="3" fill="#f7f2e8" />
-        </>
-      )
-    case 'rat':
-      return (
-        <>
-          <path d="M26 74c0-18 10-33 24-33 13 0 22 12 22 26 0 11-7 19-18 19H26Z" fill={ink} />
-          <circle cx="48" cy="46" r="7" fill={ink} />
-          <circle cx="42" cy="39" r="5" fill={ink} />
-          <circle cx="55" cy="50" r="2.2" fill="#f7f2e8" />
-          <path d="M63 74c11-1 18-8 18-17 0-8-5-13-13-15" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
-        </>
-      )
-    case 'monkey':
-      return (
-        <>
-          <circle cx="48" cy="42" r="11" fill={ink} />
-          <path d="M28 78c0-20 10-34 24-34 13 0 23 12 23 27 0 10-6 17-17 17H28Z" fill={ink} />
-          <path d="M30 66c-6 0-12 5-12 13 0 8 6 13 13 13" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
-          <path d="M59 65c6 7 11 10 17 10" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
-          <circle cx="65" cy="55" r="6" fill={accentInk} />
-        </>
-      )
-    case 'dots-2':
-    case 'dots-4':
-    case 'dots-5':
-    case 'dots-6':
-      return <>{renderDotCluster(theme.glyphKind, ink, accentInk)}</>
-    case 'bamboo-2':
-    case 'bamboo-3':
-    case 'bamboo-4':
-    case 'bamboo-5':
-      return <>{renderBambooCluster(theme.glyphKind, ink, accentInk)}</>
-    case 'east':
-      return (
-        <text x="48" y="72" textAnchor="middle" fontSize="54" fontWeight="900" fill={ink}>
-          东
-        </text>
-      )
-    case 'south':
-      return (
-        <text x="48" y="72" textAnchor="middle" fontSize="54" fontWeight="900" fill={ink}>
-          南
-        </text>
-      )
-    case 'frame-red':
-      return (
-        <>
-          <rect x="24" y="25" width="46" height="54" rx="4" fill="none" stroke={ink} strokeWidth="6" />
-          <path d="M24 33h12M58 25v12M70 69H58M36 79V67" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
-        </>
-      )
-    case 'frame-green':
-      return (
-        <>
-          <rect x="24" y="25" width="46" height="54" rx="4" fill="none" stroke={ink} strokeWidth="6" />
-          <path d="M24 33h12M58 25v12M70 69H58M36 79V67" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
-        </>
-      )
-    case 'blossom':
-      return (
-        <>
-          <circle cx="48" cy="52" r="8" fill={accentInk} />
-          <circle cx="48" cy="34" r="10" fill={ink} />
-          <circle cx="64" cy="44" r="10" fill={ink} />
-          <circle cx="58" cy="62" r="10" fill={ink} />
-          <circle cx="38" cy="62" r="10" fill={ink} />
-          <circle cx="32" cy="44" r="10" fill={ink} />
-        </>
-      )
-    case 'gourd':
-      return (
-        <>
-          <circle cx="48" cy="38" r="14" fill={ink} />
-          <circle cx="48" cy="62" r="20" fill={ink} />
-          <path d="M48 19c4 0 8 2 10 5" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
-          <circle cx="42" cy="34" r="4" fill="#f7f2e8" opacity="0.35" />
-        </>
-      )
+    case 'gem':
     default:
-      return <circle cx="48" cy="54" r="18" fill={ink} />
+      return (
+        <path
+          d="M12 2 20 9 12 22 4 9 12 2Z"
+          fill={fill}
+          stroke={stroke}
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+        />
+      )
   }
 }
 
-function getBadgeFamilyLabel(family: TileTheme['badgeFamily']) {
-  switch (family) {
-    case 'animal':
-      return '兽'
-    case 'dots':
-      return '圈'
-    case 'bamboo':
-      return '条'
-    case 'symbol':
-      return '纹'
+function renderGraphicGlyph(theme: TileTheme) {
+  const ink = theme.ink
+  const accentInk = theme.accentInk
+  const detailInk = theme.detailInk
+
+  switch (theme.glyphKind) {
+    case 'ember':
+      return (
+        <>
+          <path
+            d="M48 18c5 9 4 15-1 22 10-3 18 4 18 16 0 14-9 24-22 24S20 70 20 57c0-8 4-14 11-18-2 8 1 14 8 16-3-10 0-24 9-37Z"
+            fill={ink}
+          />
+          <path d="M47 35c4 6 4 11 0 16 5-1 9 2 9 8 0 7-5 12-12 12s-12-5-12-11c0-5 3-8 7-10-1 4 1 7 4 8-2-6-1-14 4-23Z" fill={accentInk} />
+          <path d="M48 22c3 6 2 10-1 15" fill="none" stroke={detailInk} strokeWidth="4" strokeLinecap="round" />
+        </>
+      )
+    case 'leaf':
+      return (
+        <>
+          <path
+            d="M72 29c-18 2-34 15-41 33 10 10 27 12 40 5C83 58 87 41 72 29Z"
+            fill={ink}
+          />
+          <path d="M28 61c14-9 27-18 38-28" fill="none" stroke={accentInk} strokeWidth="5" strokeLinecap="round" />
+          <path d="M39 53c5 1 9 4 12 8M48 45c4 1 8 3 11 7" fill="none" stroke={detailInk} strokeWidth="3.6" strokeLinecap="round" />
+        </>
+      )
+    case 'bloom':
+      return (
+        <>
+          <circle cx="48" cy="34" r="11" fill={ink} />
+          <circle cx="65" cy="47" r="11" fill={ink} />
+          <circle cx="58" cy="67" r="11" fill={ink} />
+          <circle cx="38" cy="67" r="11" fill={ink} />
+          <circle cx="31" cy="47" r="11" fill={ink} />
+          <circle cx="48" cy="51" r="8" fill={accentInk} />
+          <path d="M48 44v14M41 51h14" fill="none" stroke={detailInk} strokeWidth="3.8" strokeLinecap="round" />
+        </>
+      )
+    case 'bell':
+      return (
+        <>
+          <path d="M31 65c0-17 5-31 17-38 13 5 18 20 18 38H31Z" fill={ink} />
+          <path d="M28 65h40c0 7-9 12-20 12s-20-5-20-12Z" fill={accentInk} />
+          <circle cx="48" cy="69" r="5" fill={detailInk} />
+          <path d="M42 26c1-4 3-7 6-9 3 2 5 5 6 9" fill="none" stroke={detailInk} strokeWidth="4" strokeLinecap="round" />
+        </>
+      )
+    case 'cloud':
+      return (
+        <>
+          <path d="M33 67c-9 0-15-5-15-12 0-7 6-13 15-13 2-12 12-20 25-20 12 0 21 7 23 19 7 1 12 6 12 13 0 8-7 13-17 13H33Z" fill={ink} />
+          <path d="M49 64c6 0 10 4 10 9 0 7-6 12-11 18-6-6-11-11-11-18 0-5 5-9 12-9Z" fill={accentInk} />
+          <path d="M45 34c7-3 16 0 21 7" fill="none" stroke={detailInk} strokeWidth="4" strokeLinecap="round" />
+        </>
+      )
+    case 'shell':
+      return (
+        <>
+          <path d="M20 66c2-24 15-39 28-39 13 0 26 15 28 39H20Z" fill={ink} />
+          <path d="M28 66V42M40 66V35M48 66V31M56 66V35M68 66V42" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
+          <path d="M24 71h48" fill="none" stroke={detailInk} strokeWidth="4.5" strokeLinecap="round" />
+        </>
+      )
+    case 'berry':
+      return (
+        <>
+          <circle cx="37" cy="43" r="10" fill={ink} />
+          <circle cx="57" cy="41" r="10" fill={ink} />
+          <circle cx="31" cy="61" r="10" fill={ink} />
+          <circle cx="52" cy="62" r="11" fill={accentInk} />
+          <path d="M48 26 52 33 60 34 54 39 56 47 48 43 40 47 42 39 36 34 44 33Z" fill={detailInk} />
+        </>
+      )
+    case 'pine':
+      return (
+        <>
+          <path d="M48 24c13 0 24 13 24 30 0 16-11 28-24 28S24 70 24 54c0-17 11-30 24-30Z" fill={ink} />
+          <path
+            d="M37 38c4-4 8-5 11-5s7 1 11 5c-4 4-8 5-11 5s-7-1-11-5Zm-4 13c5-5 10-7 15-7s10 2 15 7c-5 5-10 7-15 7s-10-2-15-7Zm4 14c4-4 8-5 11-5s7 1 11 5c-4 4-8 5-11 5s-7-1-11-5Z"
+            fill={accentInk}
+          />
+          <path d="M48 22v60" fill="none" stroke={detailInk} strokeWidth="4" strokeLinecap="round" />
+        </>
+      )
+    case 'wave':
+      return (
+        <>
+          <path d="M20 53c8-10 18-15 29-15 10 0 18 4 27 12 6 5 12 8 19 8" fill="none" stroke={ink} strokeWidth="8" strokeLinecap="round" />
+          <path d="M18 69c9-8 18-12 28-12 11 0 19 4 28 11 6 5 11 7 18 7" fill="none" stroke={accentInk} strokeWidth="8" strokeLinecap="round" />
+          <path d="M24 41c7-8 15-12 24-12" fill="none" stroke={detailInk} strokeWidth="4" strokeLinecap="round" />
+        </>
+      )
+    case 'spire':
+      return (
+        <>
+          <path d="m48 18 22 20-10 34H36L26 38l22-20Z" fill={ink} />
+          <path d="m48 18 9 21-9 33-9-33 9-21Z" fill={accentInk} />
+          <path d="M33 50h30" fill="none" stroke={detailInk} strokeWidth="4" strokeLinecap="round" />
+        </>
+      )
+    case 'crown':
+      return (
+        <>
+          <path d="m20 69 8-30 18 15 13-22 17 37H20Z" fill={ink} />
+          <path d="m29 69 6-14 11 8 14-12 9 18H29Z" fill={accentInk} />
+          <path d="M26 73h44" fill="none" stroke={detailInk} strokeWidth="5" strokeLinecap="round" />
+        </>
+      )
+    case 'mask':
+      return (
+        <>
+          <path d="M23 44c8-10 17-15 25-15 10 0 18 4 25 15-1 18-11 31-25 31S24 62 23 44Z" fill={ink} />
+          <path d="M28 48c4-5 7-7 11-7 4 0 7 2 10 7-3 2-7 3-10 3-4 0-8-1-11-3Zm19 0c4-5 7-7 11-7 3 0 6 2 10 7-4 2-7 3-10 3-4 0-7-1-11-3Z" fill={accentInk} />
+          <path d="M37 61c3 3 7 5 11 5s8-2 11-5" fill="none" stroke={detailInk} strokeWidth="4" strokeLinecap="round" />
+        </>
+      )
+    case 'plume':
+      return (
+        <>
+          <path d="M66 26c-22 5-35 25-35 46 0 7 2 13 6 18 17-9 28-28 28-49 0-8-1-12 1-15Z" fill={ink} />
+          <path d="M38 86c8-18 14-36 20-56" fill="none" stroke={accentInk} strokeWidth="4.6" strokeLinecap="round" />
+          <path d="M42 66c6-4 12-7 18-9M45 53c5-3 10-5 14-7" fill="none" stroke={detailInk} strokeWidth="3.4" strokeLinecap="round" />
+        </>
+      )
+    case 'lantern':
+      return (
+        <>
+          <path d="M31 31h34l4 11-6 26H33l-6-26 4-11Z" fill={ink} />
+          <path d="M37 45h22M37 56h22" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
+          <path d="M44 22h8M44 75h8M48 75v11" fill="none" stroke={detailInk} strokeWidth="4" strokeLinecap="round" />
+          <circle cx="48" cy="91" r="4" fill={accentInk} />
+        </>
+      )
+    case 'dagger':
+      return (
+        <>
+          <path d="M49 19 60 31 53 43l6 26-11 11-11-11 6-26-7-12 13-12Z" fill={ink} />
+          <path d="M48 27v40" fill="none" stroke={accentInk} strokeWidth="4.4" strokeLinecap="round" />
+          <path d="M33 44h30" fill="none" stroke={detailInk} strokeWidth="5" strokeLinecap="round" />
+          <circle cx="48" cy="78" r="5" fill={accentInk} />
+        </>
+      )
+    case 'harp':
+      return (
+        <>
+          <path d="M35 24c14 4 21 14 21 29 0 13-4 24-12 33H30c10-10 16-22 16-38 0-8-4-16-11-24Z" fill={ink} />
+          <path d="M56 26h14l-8 60H48" fill="none" stroke={accentInk} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M49 36v30M54 34v31M59 33v30M64 32v28" fill="none" stroke={detailInk} strokeWidth="2.8" strokeLinecap="round" />
+        </>
+      )
+    case 'rose':
+      return (
+        <>
+          <path d="M48 25c12 0 21 9 21 21S60 71 48 71 27 62 27 50c0-5 2-10 5-14 4-7 9-11 16-11Z" fill={ink} />
+          <path d="M48 36c6 0 10 4 10 9 0 5-4 9-10 9-5 0-9-4-9-9 0-5 4-9 9-9Zm-7 25c3 4 6 6 7 15M55 60c6 3 9 7 12 14" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
+          <path d="M43 36c2 2 3 5 3 8 0 3-1 6-3 8" fill="none" stroke={detailInk} strokeWidth="3.4" strokeLinecap="round" />
+        </>
+      )
+    case 'comet':
+      return (
+        <>
+          <path d="M64 30c8 0 14 6 14 14S72 58 64 58 50 52 50 44s6-14 14-14Z" fill={ink} />
+          <path d="M50 44c-10 0-19 5-27 16 6-12 7-21 2-30 8 5 16 7 25 7" fill={accentInk} />
+          <path d="M64 36c4 1 6 4 6 8" fill="none" stroke={detailInk} strokeWidth="4" strokeLinecap="round" />
+        </>
+      )
+    case 'key':
+      return (
+        <>
+          <path d="M35 48a13 13 0 1 1 26 0 13 13 0 0 1-26 0Z" fill={ink} />
+          <path d="M48 48 72 72" fill="none" stroke={ink} strokeWidth="10" strokeLinecap="round" />
+          <path d="M60 60h10v6h-4v5h-6v-4h-5v-6h5v-5Z" fill={accentInk} />
+          <circle cx="48" cy="48" r="6" fill={accentInk} />
+          <path d="M41 39c2-3 5-4 9-4" fill="none" stroke={detailInk} strokeWidth="3.4" strokeLinecap="round" />
+        </>
+      )
+    case 'pearl':
+      return (
+        <>
+          <path d="M39 24h18v9l9 10v18c0 11-8 20-18 20s-18-9-18-20V43l9-10v-9Z" fill={ink} />
+          <path d="M39 43h18v13c-4 3-8 4-12 4-4 0-7-1-10-4V43Z" fill={accentInk} />
+          <circle cx="56" cy="54" r="5" fill="#fff8ef" opacity="0.8" />
+          <path d="M41 24h14M39 33h18" fill="none" stroke={detailInk} strokeWidth="4" strokeLinecap="round" />
+        </>
+      )
     default:
-      return ''
+      return <circle cx="48" cy="56" r="18" fill={ink} />
   }
 }
 
@@ -609,23 +665,23 @@ function CardFace({
   mood: TileMood
   compact?: boolean
 }) {
-  const familyLabel = getBadgeFamilyLabel(theme.badgeFamily)
-
   return (
     <span className={`card-face card-face--${mood}${compact ? ' card-face--compact' : ''}`} aria-hidden="true">
       <span className="card-face__plate" />
       <span className="card-face__medallion" />
-      <span className="card-face__corner card-face__corner--top">
-        <strong>{theme.label}</strong>
-        <em>{familyLabel}</em>
+      <span className="card-face__badge card-face__badge--top">
+        <svg viewBox="0 0 24 24" className="card-face__badge-icon" focusable="false">
+          {renderCornerBadge(theme)}
+        </svg>
       </span>
       <svg viewBox="0 0 96 112" className="card-face__art" focusable="false">
-        {renderMahjongGlyph(theme)}
+        {renderGraphicGlyph(theme)}
       </svg>
       {!compact ? (
-        <span className="card-face__corner card-face__corner--bottom">
-          <strong>{theme.label}</strong>
-          <em>{familyLabel}</em>
+        <span className="card-face__badge card-face__badge--bottom">
+          <svg viewBox="0 0 24 24" className="card-face__badge-icon" focusable="false">
+            {renderCornerBadge(theme)}
+          </svg>
         </span>
       ) : null}
     </span>
@@ -663,8 +719,11 @@ function getTileStyle(tile: TileDefinition) {
     zIndex: tile.layer * 10 + Math.round(tile.y / 10),
     '--tile-ink': theme.ink,
     '--tile-accent-ink': theme.accentInk,
+    '--tile-detail-ink': theme.detailInk,
+    '--tile-outline': theme.outline,
     '--tile-shadow': theme.shadowGlow,
     '--tile-pattern': theme.facePattern,
+    '--tile-badge-ink': theme.badgeInk,
   } as CSSProperties
 }
 
@@ -674,8 +733,11 @@ function getTrayStyle(tileType: TileType, config: GameConfig) {
   return {
     '--tile-ink': theme.ink,
     '--tile-accent-ink': theme.accentInk,
+    '--tile-detail-ink': theme.detailInk,
+    '--tile-outline': theme.outline,
     '--tile-shadow': theme.shadowGlow,
     '--tile-pattern': theme.facePattern,
+    '--tile-badge-ink': theme.badgeInk,
     '--entry-duration': `${config.animationMs.trayEntry}ms`,
   } as CSSProperties
 }
@@ -700,7 +762,9 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   })
   const [completionDurationMs, setCompletionDurationMs] = useState<number | null>(null)
   const [passiveHintTileId, setPassiveHintTileId] = useState<string | null>(null)
+  const [quickShiftTileIds, setQuickShiftTileIds] = useState<string[]>([])
   const completionKeyRef = useRef<string | null>(null)
+  const quickShiftCursorRef = useRef(0)
 
   const currentLevel = getCampaignLevelById(selectedLevelId, campaign) ?? fallbackLevel
   const [state, dispatch] = useReducer(
@@ -792,6 +856,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     passiveHintTileId !== null &&
     passiveHintTileId === displayedHintTileId &&
     state.lastHintTileId === null
+  const quickShiftActive = view === 'game' && sessionMode === 'quick'
+  const shiftingTileIdSet = new Set(quickShiftTileIds)
 
   function playSound(kind: UiSoundKind) {
     if (!soundEnabled) {
@@ -809,9 +875,54 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     playUiSound(kind)
   })
 
+  const triggerQuickShift = useEffectEvent(() => {
+    if (view !== 'game' || sessionMode !== 'quick' || state.status !== 'playing' || isResolvingMatch) {
+      return
+    }
+
+    const plan = buildQuickShiftPlan(state, config, quickShiftCursorRef.current)
+
+    if (!plan) {
+      return
+    }
+
+    quickShiftCursorRef.current += 1
+    setPassiveHintTileId(null)
+    setQuickShiftTileIds(plan.shiftedTileIds)
+    dispatch({ type: 'quick-shift', typeMap: plan.typeMap })
+  })
+
   useEffect(() => {
     savePreferences({ soundEnabled })
   }, [soundEnabled])
+
+  useEffect(() => {
+    if (!quickShiftActive || state.status !== 'playing' || isResolvingMatch) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      triggerQuickShift()
+    }, QUICK_SHIFT_INTERVAL_MS)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [config, isResolvingMatch, quickShiftActive, state.boardTiles, state.status, state.trayTiles.length])
+
+  useEffect(() => {
+    if (quickShiftTileIds.length === 0) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      setQuickShiftTileIds([])
+    }, QUICK_SHIFT_FLASH_MS)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [quickShiftTileIds])
 
   useEffect(() => {
     if (typeof window.advanceTime === 'function') {
@@ -851,6 +962,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
             id: campaign.id,
             selectedLevelId,
             sessionMode,
+            quickRule: sessionMode === 'quick' ? 'speed-shift' : null,
             unlockedCount,
             completedCount,
             totalLevels: campaignLevels.length,
@@ -876,6 +988,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
           id: campaign.id,
           selectedLevelId,
           sessionMode,
+          quickRule: sessionMode === 'quick' ? 'speed-shift' : null,
           unlockedCount,
           completedCount,
           totalLevels: campaignLevels.length,
@@ -898,6 +1011,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
         assistCharges: state.assistCharges,
         lastHintTileId: state.lastHintTileId,
         autoHintTileId: passiveHintTileId,
+        quickShiftTileIds,
         remainingCount: getRemainingBoardTiles(state).length,
         exposedTiles: getRemainingBoardTiles(state)
           .filter((tile) => !isTileBlocked(tile.id, state, config))
@@ -928,6 +1042,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     currentScore,
     matchedPairs,
     passiveHintTileId,
+    quickShiftTileIds,
     sessionMode,
     selectedChapterId,
     selectedLevelId,
@@ -1077,6 +1192,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     })
     setCompletionDurationMs(null)
     setPassiveHintTileId(null)
+    setQuickShiftTileIds([])
+    quickShiftCursorRef.current = 0
     setGameMenuOpen(false)
     setSessionMode(mode)
     setStartedAt(Date.now())
@@ -1092,6 +1209,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     })
     setCompletionDurationMs(null)
     setPassiveHintTileId(null)
+    setQuickShiftTileIds([])
+    quickShiftCursorRef.current = 0
     setGameMenuOpen(false)
     setStartedAt(Date.now())
     dispatch({ type: 'restart' })
@@ -1100,6 +1219,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   function returnToCampaign() {
     completionKeyRef.current = null
     setPassiveHintTileId(null)
+    setQuickShiftTileIds([])
+    quickShiftCursorRef.current = 0
     setGameMenuOpen(false)
     setSessionMode('campaign')
     setView('campaign')
@@ -1144,6 +1265,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     completionKeyRef.current = null
     setCompletionDurationMs(null)
     setPassiveHintTileId(null)
+    setQuickShiftTileIds([])
+    quickShiftCursorRef.current = 0
     setCampaignProgress(nextProgress)
     setSelectedLevelId(nextProgress.currentLevelId)
     setSessionMode('campaign')
@@ -1216,7 +1339,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                     第 {currentLevel.campaign?.order ?? 1} 关 · {currentLevel.name}
                   </span>
                   <span>{getRecommendedGoal(currentLevel)}</span>
-                  <span>快速单局会使用：{quickPlayLevel.name}</span>
+                  <span>快速单局默认使用：{quickPlayLevel.name}</span>
+                  <span>快速模式会每 1 秒轮换一批可点击牌，拼手速凑对子。</span>
                 </div>
               </div>
             </section>
@@ -1320,27 +1444,27 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
               </section>
             ) : null}
 
-              <div className="intro-rules">
+            <div className="intro-rules">
               <div className="rule-chip">暖白麻将砖</div>
               <div className="rule-chip">深绿桌布</div>
               <div className="rule-chip">顶部四格槽</div>
-              <div className="rule-chip">动态局内分数</div>
+              <div className="rule-chip">快速单局 · 1秒轮换</div>
             </div>
 
             <div className="campaign-actions">
               <button
                 type="button"
-                className="primary-button"
-                onClick={() => startLevel(campaignProgress.currentLevelId, 'campaign')}
+                className="primary-button primary-button--quick"
+                onClick={() => startLevel(quickPlayLevel.id, 'quick')}
               >
-                继续战役
+                快速单局
               </button>
               <button
                 type="button"
                 className="secondary-button"
-                onClick={() => startLevel(quickPlayLevel.id, 'quick')}
+                onClick={() => startLevel(campaignProgress.currentLevelId, 'campaign')}
               >
-                快速单局
+                继续战役
               </button>
               <button
                 type="button"
@@ -1564,6 +1688,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                   const theme = TILE_THEMES[tile.type]
                   const blocked = blockedTileIds.has(tile.id)
                   const hinted = displayedHintTileId === tile.id
+                  const shifting = shiftingTileIdSet.has(tile.id)
                   const visualState: TileMood = blocked
                     ? 'board-blocked'
                     : hinted
@@ -1576,6 +1701,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                       type="button"
                       className={`tile-card${blocked ? ' is-blocked' : ''}${
                         hinted ? ' is-hinted' : ''
+                      }${shifting ? ' is-shifting' : ''}${
+                        quickShiftActive && state.status === 'playing' && shifting ? ' is-quick-shift' : ''
                       }${autoHintActive && hinted ? ' is-passive-hinted' : ''}`}
                       style={getTileStyle(tile)}
                       onClick={() => handlePickTile(tile.id)}

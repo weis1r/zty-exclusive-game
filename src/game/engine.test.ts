@@ -302,12 +302,12 @@ describe('game engine', () => {
     ])
   })
 
-  it('starts the default level with a compact visible opening layer', () => {
+  it('starts the default level with a tighter silhouette opening layer', () => {
     const state = createInitialGameState(DEFAULT_LEVEL, 'playing')
     const exposedTiles = DEFAULT_LEVEL.tiles.filter((tile) => !isTileBlocked(tile.id, state, GAME_CONFIG))
 
-    expect(exposedTiles).toHaveLength(18)
-    expect(DEFAULT_LEVEL.tiles.filter((tile) => isTileBlocked(tile.id, state, GAME_CONFIG))).toHaveLength(30)
+    expect(exposedTiles).toHaveLength(12)
+    expect(DEFAULT_LEVEL.tiles.filter((tile) => isTileBlocked(tile.id, state, GAME_CONFIG))).toHaveLength(36)
   })
 
   it('starts the default level with four visible tile types and immediate safe pairs', () => {
@@ -319,13 +319,24 @@ describe('game engine', () => {
     }, {})
 
     expect(Object.keys(exposedTypeCounts)).toHaveLength(4)
-    expect(Object.values(exposedTypeCounts).every((count) => count >= 3)).toBe(true)
+    expect(Object.values(exposedTypeCounts).filter((count) => count >= 2)).toHaveLength(3)
   })
 
   it('ramps tile variety across the 20-level campaign', () => {
     expect(CAMPAIGN_LEVELS.map((level) => getLevelUniqueTypeCount(level))).toEqual([
       4, 5, 6, 6, 5, 6, 6, 7, 6, 7, 7, 8, 7, 8, 8, 9, 8, 9, 10, 12,
     ])
+  })
+
+  it('ships 20 distinct silhouette layouts instead of reusing four templates', () => {
+    const layoutSignatures = CAMPAIGN_LEVELS.map((level) =>
+      level.tiles
+        .map((tile) => `${tile.layer}:${tile.x}:${tile.y}`)
+        .sort()
+        .join('|'),
+    )
+
+    expect(new Set(layoutSignatures).size).toBe(20)
   })
 
   it('keeps assist charges on the intended difficulty curve', () => {

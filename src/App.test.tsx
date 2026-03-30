@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { GameApp } from './App'
 import { GAME_CONFIG } from './game/config'
+import { createInitialGameState } from './game/engine'
+import { buildQuickShiftPlan } from './quickPlayRules'
+import { GameApp } from './App'
 import type {
   CampaignChapterDefinition,
   CampaignDefinition,
@@ -176,6 +178,53 @@ describe('GameApp interactions', () => {
     expect(screen.getByTestId('selected-count')).toHaveTextContent('0 次')
     expect(screen.getByTestId('remaining-count')).toHaveTextContent('4 块')
     expect(screen.queryByTestId('tray-slot-0')).not.toBeInTheDocument()
+  })
+
+  it('enters quick play mode with the speed-shift rule enabled', () => {
+    const campaign = createCampaign('app-campaign-quick-shift', [
+      createLevel('quick-level', '疾速关', 1, [
+        { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
+        { id: 'ember-2', type: 'ember', x: 80, y: 0, layer: 0 },
+        { id: 'leaf-1', type: 'leaf', x: 160, y: 0, layer: 0 },
+        { id: 'leaf-2', type: 'leaf', x: 240, y: 0, layer: 0 },
+        { id: 'bloom-1', type: 'bloom', x: 0, y: 100, layer: 0 },
+        { id: 'bloom-2', type: 'bloom', x: 80, y: 100, layer: 0 },
+        { id: 'bell-1', type: 'bell', x: 160, y: 100, layer: 0 },
+        { id: 'bell-2', type: 'bell', x: 240, y: 100, layer: 0 },
+      ]),
+    ])
+
+    render(<GameApp campaign={campaign} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '快速单局' }))
+
+    const nextState = JSON.parse(window.render_game_to_text?.() ?? '{}')
+
+    expect(nextState.view).toBe('game')
+    expect(nextState.campaign.sessionMode).toBe('quick')
+    expect(nextState.campaign.quickRule).toBe('speed-shift')
+  })
+
+  it('builds a paired quick-shift plan from exposed tiles', () => {
+    const level = createLevel('quick-plan-level', '换牌关', 1, [
+      { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
+      { id: 'ember-2', type: 'ember', x: 80, y: 0, layer: 0 },
+      { id: 'leaf-1', type: 'leaf', x: 160, y: 0, layer: 0 },
+      { id: 'leaf-2', type: 'leaf', x: 240, y: 0, layer: 0 },
+      { id: 'bloom-1', type: 'bloom', x: 0, y: 100, layer: 0 },
+      { id: 'bloom-2', type: 'bloom', x: 80, y: 100, layer: 0 },
+      { id: 'bell-1', type: 'bell', x: 160, y: 100, layer: 0 },
+      { id: 'bell-2', type: 'bell', x: 240, y: 100, layer: 0 },
+    ])
+    const state = createInitialGameState(level, 'playing')
+    const plan = buildQuickShiftPlan(state, GAME_CONFIG, 0)
+
+    expect(plan).not.toBeNull()
+    expect(plan?.shiftedTileIds).toHaveLength(4)
+    expect(plan?.typeMap['ember-1']).toBe('leaf')
+    expect(plan?.typeMap['ember-2']).toBe('leaf')
+    expect(plan?.typeMap['leaf-1']).toBe('ember')
+    expect(plan?.typeMap['leaf-2']).toBe('ember')
   })
 
   it('unlocks the next level after victory and shows the next-level action', async () => {

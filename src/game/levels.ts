@@ -31,7 +31,33 @@ interface ChapterBlueprint {
   accentColor?: string
 }
 
-type LevelLayoutId = 'stack48' | 'stack60' | 'stack72' | 'stack84'
+interface SilhouetteLayoutInput {
+  tileCount: number
+  openingCount: number
+  mask: string[]
+}
+
+type LevelLayoutId =
+  | 'circle'
+  | 'triangle'
+  | 'diamond'
+  | 'star-cross'
+  | 'wave-sweep'
+  | 'arrow'
+  | 'hourglass'
+  | 'crown'
+  | 'vase'
+  | 'tree'
+  | 'house'
+  | 'bridge'
+  | 'lantern'
+  | 'butterfly'
+  | 'sailboat'
+  | 'umbrella'
+  | 'castle'
+  | 'rocket'
+  | 'key'
+  | 'dragon-head'
 type TileCountSpec = readonly [TileType, number]
 type FillerPatternId = 'paired' | 'echo' | 'braid' | 'cross' | 'orbit'
 
@@ -68,6 +94,18 @@ interface LevelBlueprintInput {
 
 const BOARD_WIDTH = 344
 const BOARD_HEIGHT = 568
+const BOARD_COLUMNS = 7
+const BOARD_ROWS = 9
+const CELL_STEP_X = 40
+const CELL_STEP_Y = 48
+const ROW_X_JITTER = [-4, 8, -8, 6, -2, 10, -6, 8, -4]
+const ROW_Y_JITTER = [0, 4, -2, 6, 0, 8, 2, 10, 4]
+const LAYER_OFFSETS = [
+  { x: 0, y: 0 },
+  { x: 12, y: -18 },
+  { x: 4, y: -36 },
+  { x: 14, y: -54 },
+] as const
 
 function createTiles(slots: TileSlot[], types: TileType[]): TileDefinition[] {
   if (slots.length !== types.length) {
@@ -194,116 +232,264 @@ function buildLevelTypes(
   return types
 }
 
-function createLayoutSlots(
-  rows: Array<{
-    layer: number
-    y: number
-    xs: number[]
-  }>,
-) {
-  return rows.flatMap(({ layer, y, xs }) =>
-    xs.map((x) => ({
-      x,
-      y,
-      layer,
-    })),
-  )
+interface MaskCell {
+  row: number
+  col: number
+}
+
+function parseMask(mask: string[]): MaskCell[] {
+  if (mask.length !== BOARD_ROWS) {
+    throw new Error(`Mask row count must be ${BOARD_ROWS}`)
+  }
+
+  return mask.flatMap((rowText, row) => {
+    if (rowText.length !== BOARD_COLUMNS) {
+      throw new Error(`Mask column count must be ${BOARD_COLUMNS}`)
+    }
+
+    return rowText.split('').flatMap((value, col) => (value === '#' ? [{ row, col }] : []))
+  })
+}
+
+function getCellKey(cell: MaskCell) {
+  return `${cell.row}:${cell.col}`
+}
+
+function buildSilhouetteLayout(input: SilhouetteLayoutInput): LevelLayoutDefinition {
+  const cells = parseMask(input.mask)
+
+  if (cells.length === 0) {
+    throw new Error('Silhouette layout must contain at least one cell')
+  }
+
+  if (cells.length > input.tileCount) {
+    throw new Error(`Silhouette base cells ${cells.length} exceed tile count ${input.tileCount}`)
+  }
+
+  const averageRow = cells.reduce((sum, cell) => sum + cell.row, 0) / cells.length
+  const averageCol = cells.reduce((sum, cell) => sum + cell.col, 0) / cells.length
+  const priorityCells = [...cells].sort((leftCell, rightCell) => {
+    const leftDistance =
+      Math.abs(leftCell.row - averageRow) * 1.2 + Math.abs(leftCell.col - averageCol)
+    const rightDistance =
+      Math.abs(rightCell.row - averageRow) * 1.2 + Math.abs(rightCell.col - averageCol)
+
+    if (leftDistance !== rightDistance) {
+      return leftDistance - rightDistance
+    }
+
+    if (leftCell.row !== rightCell.row) {
+      return leftCell.row - rightCell.row
+    }
+
+    return leftCell.col - rightCell.col
+  })
+
+  if (priorityCells.length < input.openingCount) {
+    throw new Error(`Silhouette needs at least ${input.openingCount} cells for the opening layer`)
+  }
+
+  const heights = new Map<string, number>(cells.map((cell) => [getCellKey(cell), 1]))
+  let remainingExtras = input.tileCount - cells.length
+
+  priorityCells.slice(0, input.openingCount).forEach((cell) => {
+    const key = getCellKey(cell)
+
+    for (let level = 0; level < 3 && remainingExtras > 0; level += 1) {
+      heights.set(key, (heights.get(key) ?? 1) + 1)
+      remainingExtras -= 1
+    }
+  })
+
+  const supportCells = priorityCells.slice(input.openingCount)
+
+  for (const targetHeight of [2, 3]) {
+    supportCells.forEach((cell) => {
+      if (remainingExtras <= 0) {
+        return
+      }
+
+      const key = getCellKey(cell)
+      const currentHeight = heights.get(key) ?? 1
+
+      if (currentHeight < targetHeight) {
+        heights.set(key, currentHeight + 1)
+        remainingExtras -= 1
+      }
+    })
+  }
+
+  if (remainingExtras !== 0) {
+    throw new Error(`Unable to build silhouette layout with ${input.tileCount} tiles`)
+  }
+
+  const minRow = Math.min(...cells.map((cell) => cell.row))
+  const maxRow = Math.max(...cells.map((cell) => cell.row))
+  const minCol = Math.min(...cells.map((cell) => cell.col))
+  const maxCol = Math.max(...cells.map((cell) => cell.col))
+  const minRowJitter = Math.min(...ROW_X_JITTER)
+  const maxRowJitter = Math.max(...ROW_X_JITTER)
+  const minYJitter = Math.min(...ROW_Y_JITTER)
+  const maxYJitter = Math.max(...ROW_Y_JITTER)
+  const minLayerX = Math.min(...LAYER_OFFSETS.map((offset) => offset.x))
+  const maxLayerX = Math.max(...LAYER_OFFSETS.map((offset) => offset.x))
+  const minLayerY = Math.min(...LAYER_OFFSETS.map((offset) => offset.y))
+  const maxLayerY = Math.max(...LAYER_OFFSETS.map((offset) => offset.y))
+  const spanX = (maxCol - minCol) * CELL_STEP_X
+  const spanY = (maxRow - minRow) * CELL_STEP_Y
+  const extentX =
+    spanX + 70 + (maxRowJitter + maxLayerX) - (minRowJitter + minLayerX)
+  const extentY =
+    spanY + 86 + (maxYJitter + maxLayerY) - (minYJitter + minLayerY)
+  const baseX = Math.round((BOARD_WIDTH - extentX) / 2) - (minRowJitter + minLayerX)
+  const baseY = Math.round((BOARD_HEIGHT - extentY) / 2) - (minYJitter + minLayerY)
+
+  const slots: TileSlot[] = []
+
+  for (let layer = 3; layer >= 0; layer -= 1) {
+    priorityCells
+      .filter((cell) => (heights.get(getCellKey(cell)) ?? 1) > layer)
+      .sort((leftCell, rightCell) => {
+        if (leftCell.row !== rightCell.row) {
+          return leftCell.row - rightCell.row
+        }
+
+        return leftCell.col - rightCell.col
+      })
+      .forEach((cell) => {
+        const relativeRow = cell.row - minRow
+        const relativeCol = cell.col - minCol
+
+        slots.push({
+          x:
+            baseX +
+            relativeCol * CELL_STEP_X +
+            ROW_X_JITTER[(cell.row + BOARD_ROWS) % BOARD_ROWS] +
+            LAYER_OFFSETS[layer].x,
+          y:
+            baseY +
+            relativeRow * CELL_STEP_Y +
+            ROW_Y_JITTER[(cell.row + BOARD_ROWS) % BOARD_ROWS] +
+            LAYER_OFFSETS[layer].y,
+          layer,
+        })
+      })
+  }
+
+  if (slots.length !== input.tileCount) {
+    throw new Error(`Expected ${input.tileCount} slots but built ${slots.length}`)
+  }
+
+  return {
+    slots,
+    boardWidth: BOARD_WIDTH,
+    boardHeight: BOARD_HEIGHT,
+    openingCount: input.openingCount,
+    tileCount: input.tileCount,
+  }
 }
 
 const LEVEL_LAYOUTS: Record<LevelLayoutId, LevelLayoutDefinition> = {
-  stack48: {
-    slots: createLayoutSlots([
-      { layer: 3, y: 106, xs: [28, 118, 210] },
-      { layer: 3, y: 154, xs: [72, 162, 246] },
-      { layer: 2, y: 134, xs: [2, 94, 188] },
-      { layer: 2, y: 198, xs: [40, 132, 222, 266] },
-      { layer: 2, y: 258, xs: [18, 110, 202] },
-      { layer: 1, y: 170, xs: [0, 74, 160, 246] },
-      { layer: 1, y: 232, xs: [30, 122, 212] },
-      { layer: 1, y: 294, xs: [12, 100, 188, 262] },
-      { layer: 1, y: 356, xs: [46, 138, 228] },
-      { layer: 0, y: 208, xs: [0, 62, 146, 228, 274] },
-      { layer: 0, y: 270, xs: [28, 116, 204, 266] },
-      { layer: 0, y: 332, xs: [0, 84, 168, 246, 274] },
-      { layer: 0, y: 394, xs: [38, 126, 214, 274] },
-    ]),
-    boardWidth: BOARD_WIDTH,
-    boardHeight: BOARD_HEIGHT,
-    openingCount: 6,
+  circle: buildSilhouetteLayout({
     tileCount: 48,
-  },
-  stack60: {
-    slots: createLayoutSlots([
-      { layer: 3, y: 92, xs: [18, 108, 198] },
-      { layer: 3, y: 138, xs: [62, 154, 244] },
-      { layer: 2, y: 118, xs: [0, 92, 184] },
-      { layer: 2, y: 174, xs: [34, 126, 216, 266] },
-      { layer: 2, y: 232, xs: [14, 86, 158, 230, 274] },
-      { layer: 1, y: 150, xs: [0, 74, 158, 242] },
-      { layer: 1, y: 206, xs: [24, 112, 198, 274] },
-      { layer: 1, y: 266, xs: [10, 92, 174, 248, 274] },
-      { layer: 1, y: 328, xs: [36, 116, 196, 248, 274] },
-      { layer: 0, y: 182, xs: [0, 56, 138, 220, 274] },
-      { layer: 0, y: 242, xs: [22, 106, 188, 270] },
-      { layer: 0, y: 302, xs: [0, 80, 162, 244, 274] },
-      { layer: 0, y: 362, xs: [16, 98, 180, 262] },
-      { layer: 0, y: 422, xs: [18, 84, 150, 212, 248, 274] },
-    ]),
-    boardWidth: BOARD_WIDTH,
-    boardHeight: BOARD_HEIGHT,
     openingCount: 6,
+    mask: ['..###..', '.##.##.', '##...##', '##...##', '.##.##.', '..###..', '.......', '.......', '.......'],
+  }),
+  triangle: buildSilhouetteLayout({
     tileCount: 60,
-  },
-  stack72: {
-    slots: createLayoutSlots([
-      { layer: 3, y: 84, xs: [0, 82, 168, 254] },
-      { layer: 3, y: 134, xs: [44, 126, 210, 274] },
-      { layer: 2, y: 110, xs: [18, 100, 184, 266] },
-      { layer: 2, y: 166, xs: [0, 72, 154, 236] },
-      { layer: 2, y: 224, xs: [34, 118, 202, 274] },
-      { layer: 2, y: 282, xs: [12, 94, 178, 260] },
-      { layer: 1, y: 144, xs: [0, 84, 166, 248] },
-      { layer: 1, y: 202, xs: [20, 104, 188, 270] },
-      { layer: 1, y: 260, xs: [0, 80, 164, 246] },
-      { layer: 1, y: 320, xs: [28, 112, 196, 274] },
-      { layer: 1, y: 378, xs: [50, 134, 216, 274] },
-      { layer: 0, y: 178, xs: [0, 58, 140, 222, 274] },
-      { layer: 0, y: 236, xs: [24, 106, 188, 270] },
-      { layer: 0, y: 294, xs: [0, 78, 160, 242, 274] },
-      { layer: 0, y: 352, xs: [16, 98, 180, 262] },
-      { layer: 0, y: 410, xs: [0, 84, 166, 248, 274] },
-      { layer: 0, y: 468, xs: [32, 116, 198, 250, 274] },
-    ]),
-    boardWidth: BOARD_WIDTH,
-    boardHeight: BOARD_HEIGHT,
-    openingCount: 8,
+    openingCount: 6,
+    mask: ['...#...', '..###..', '..###..', '.#####.', '.#####.', '#######', '.......', '.......', '.......'],
+  }),
+  diamond: buildSilhouetteLayout({
     tileCount: 72,
-  },
-  stack84: {
-    slots: createLayoutSlots([
-      { layer: 3, y: 78, xs: [0, 70, 152, 234, 274] },
-      { layer: 3, y: 126, xs: [30, 112, 194, 246, 274] },
-      { layer: 2, y: 104, xs: [12, 94, 176, 258] },
-      { layer: 2, y: 160, xs: [0, 66, 148, 230, 274] },
-      { layer: 2, y: 220, xs: [26, 108, 190, 272] },
-      { layer: 2, y: 278, xs: [8, 90, 172, 244, 274] },
-      { layer: 1, y: 138, xs: [0, 74, 156, 238, 274] },
-      { layer: 1, y: 196, xs: [18, 100, 182, 246, 274] },
-      { layer: 1, y: 254, xs: [0, 82, 164, 246] },
-      { layer: 1, y: 314, xs: [26, 108, 190, 256, 274] },
-      { layer: 1, y: 372, xs: [48, 130, 212, 248, 274] },
-      { layer: 0, y: 170, xs: [0, 52, 122, 196, 270] },
-      { layer: 0, y: 226, xs: [20, 94, 168, 242, 274] },
-      { layer: 0, y: 282, xs: [0, 72, 146, 220, 274] },
-      { layer: 0, y: 338, xs: [16, 90, 164, 238, 274] },
-      { layer: 0, y: 394, xs: [0, 62, 136, 210, 250, 274] },
-      { layer: 0, y: 450, xs: [32, 106, 180, 222, 248, 274] },
-    ]),
-    boardWidth: BOARD_WIDTH,
-    boardHeight: BOARD_HEIGHT,
-    openingCount: 10,
+    openingCount: 8,
+    mask: ['...#...', '..###..', '.#####.', '##...##', '.#####.', '..###..', '...#...', '.......', '.......'],
+  }),
+  'star-cross': buildSilhouetteLayout({
     tileCount: 84,
-  },
+    openingCount: 10,
+    mask: ['..###..', '..###..', '#######', '.#####.', '#######', '..###..', '..###..', '.......', '.......'],
+  }),
+  'wave-sweep': buildSilhouetteLayout({
+    tileCount: 48,
+    openingCount: 6,
+    mask: ['##...##', '.##.##.', '..###..', '...###.', '.###...', '##.##..', '##...##', '.......', '.......'],
+  }),
+  arrow: buildSilhouetteLayout({
+    tileCount: 60,
+    openingCount: 6,
+    mask: ['...#...', '..##...', '.###...', '#######', '.###...', '..##...', '...#...', '.......', '.......'],
+  }),
+  hourglass: buildSilhouetteLayout({
+    tileCount: 72,
+    openingCount: 8,
+    mask: ['##...##', '.##.##.', '..###..', '...#...', '..###..', '.##.##.', '##...##', '.......', '.......'],
+  }),
+  crown: buildSilhouetteLayout({
+    tileCount: 84,
+    openingCount: 10,
+    mask: ['#.#.#.#', '#######', '.#####.', '#######', '..###..', '..###..', '.......', '.......', '.......'],
+  }),
+  vase: buildSilhouetteLayout({
+    tileCount: 48,
+    openingCount: 6,
+    mask: ['...#...', '..###..', '..###..', '.#####.', '..###..', '..###..', '.#####.', '..###..', '.......'],
+  }),
+  tree: buildSilhouetteLayout({
+    tileCount: 60,
+    openingCount: 6,
+    mask: ['...#...', '..###..', '.#####.', '#######', '..###..', '..###..', '..###..', '.#####.', '.......'],
+  }),
+  house: buildSilhouetteLayout({
+    tileCount: 72,
+    openingCount: 8,
+    mask: ['...#...', '..###..', '.#####.', '#######', '##...##', '#######', '#######', '.......', '.......'],
+  }),
+  bridge: buildSilhouetteLayout({
+    tileCount: 84,
+    openingCount: 10,
+    mask: ['##...##', '##...##', '#######', '.#####.', '..###..', '.#####.', '#######', '.......', '.......'],
+  }),
+  lantern: buildSilhouetteLayout({
+    tileCount: 48,
+    openingCount: 6,
+    mask: ['..###..', '.#####.', '.#####.', '..###..', '..###..', '.#####.', '..###..', '...#...', '.......'],
+  }),
+  butterfly: buildSilhouetteLayout({
+    tileCount: 60,
+    openingCount: 6,
+    mask: ['##...##', '#######', '.#####.', '..###..', '.#####.', '#######', '##...##', '...#...', '.......'],
+  }),
+  sailboat: buildSilhouetteLayout({
+    tileCount: 72,
+    openingCount: 8,
+    mask: ['...#...', '..##...', '.###...', '####...', '..###..', '#######', '.#####.', '.......', '.......'],
+  }),
+  umbrella: buildSilhouetteLayout({
+    tileCount: 84,
+    openingCount: 10,
+    mask: ['.#####.', '#######', '#######', '..###..', '..###..', '..###..', '.##.##.', '.......', '.......'],
+  }),
+  castle: buildSilhouetteLayout({
+    tileCount: 48,
+    openingCount: 6,
+    mask: ['#.#.#.#', '#######', '##...##', '#######', '..###..', '.#####.', '.......', '.......', '.......'],
+  }),
+  rocket: buildSilhouetteLayout({
+    tileCount: 60,
+    openingCount: 6,
+    mask: ['...#...', '..###..', '..###..', '.#####.', '..###..', '..###..', '.##.##.', '.#####.', '..###..'],
+  }),
+  key: buildSilhouetteLayout({
+    tileCount: 72,
+    openingCount: 8,
+    mask: ['..###..', '.#####.', '.#####.', '..###..', '...#...', '...#...', '..###..', '..###..', '...#...'],
+  }),
+  'dragon-head': buildSilhouetteLayout({
+    tileCount: 84,
+    openingCount: 10,
+    mask: ['..###..', '.#####.', '#######', '##.####', '#######', '.#####.', '..###..', '..###..', '...#...'],
+  }),
 }
 
 function buildCountProfile(totalTiles: number, typePool: TileType[], favoredIndex = 0): readonly number[] {
@@ -433,7 +619,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'thorn-garden-01',
     name: '荆棘迷圃',
-    layout: 'stack48',
+    layout: 'circle',
     difficulty: 'easy',
     chapterId: 'chapter-bloom-path',
     order: 1,
@@ -445,7 +631,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'lantern-steps-02',
     name: '灯影台阶',
-    layout: 'stack60',
+    layout: 'triangle',
     difficulty: 'easy',
     chapterId: 'chapter-bloom-path',
     order: 2,
@@ -458,7 +644,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'ivy-arcade-03',
     name: '常青回廊',
-    layout: 'stack72',
+    layout: 'diamond',
     difficulty: 'easy',
     chapterId: 'chapter-bloom-path',
     order: 3,
@@ -471,7 +657,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'dew-stair-04',
     name: '晨露阶厅',
-    layout: 'stack84',
+    layout: 'star-cross',
     difficulty: 'easy',
     chapterId: 'chapter-bloom-path',
     order: 4,
@@ -484,7 +670,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'mirror-court-05',
     name: '镜庭重楼',
-    layout: 'stack48',
+    layout: 'wave-sweep',
     difficulty: 'normal',
     chapterId: 'chapter-mirror-court',
     order: 5,
@@ -497,7 +683,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'moon-pond-06',
     name: '月池回声',
-    layout: 'stack60',
+    layout: 'arrow',
     difficulty: 'normal',
     chapterId: 'chapter-mirror-court',
     order: 6,
@@ -510,7 +696,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'silver-river-07',
     name: '银流长道',
-    layout: 'stack72',
+    layout: 'hourglass',
     difficulty: 'normal',
     chapterId: 'chapter-mirror-court',
     order: 7,
@@ -523,7 +709,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'glass-canopy-08',
     name: '玻璃穹顶',
-    layout: 'stack84',
+    layout: 'crown',
     difficulty: 'normal',
     chapterId: 'chapter-mirror-court',
     order: 8,
@@ -536,7 +722,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'sunset-orchard-09',
     name: '晚照果园',
-    layout: 'stack48',
+    layout: 'vase',
     difficulty: 'normal',
     chapterId: 'chapter-sunset-orchard',
     order: 9,
@@ -549,7 +735,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'petal-carousel-10',
     name: '花瓣回旋',
-    layout: 'stack60',
+    layout: 'tree',
     difficulty: 'normal',
     chapterId: 'chapter-sunset-orchard',
     order: 10,
@@ -562,7 +748,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'prism-walk-11',
     name: '棱镜步道',
-    layout: 'stack72',
+    layout: 'house',
     difficulty: 'normal',
     chapterId: 'chapter-sunset-orchard',
     order: 11,
@@ -575,7 +761,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'crystal-vault-12',
     name: '水晶花库',
-    layout: 'stack84',
+    layout: 'bridge',
     difficulty: 'hard',
     chapterId: 'chapter-sunset-orchard',
     order: 12,
@@ -588,7 +774,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'amber-terrace-13',
     name: '琥珀阶庭',
-    layout: 'stack48',
+    layout: 'lantern',
     difficulty: 'hard',
     chapterId: 'chapter-verdant-lab',
     order: 13,
@@ -601,7 +787,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'fern-fairway-14',
     name: '蕨影长道',
-    layout: 'stack60',
+    layout: 'butterfly',
     difficulty: 'hard',
     chapterId: 'chapter-verdant-lab',
     order: 14,
@@ -614,7 +800,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'mist-vault-15',
     name: '迷雾花库',
-    layout: 'stack72',
+    layout: 'sailboat',
     difficulty: 'hard',
     chapterId: 'chapter-verdant-lab',
     order: 15,
@@ -627,7 +813,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'nectar-engine-16',
     name: '蜜泉工坊',
-    layout: 'stack84',
+    layout: 'umbrella',
     difficulty: 'hard',
     chapterId: 'chapter-verdant-lab',
     order: 16,
@@ -640,7 +826,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'starlight-archive-17',
     name: '星辉典藏馆',
-    layout: 'stack48',
+    layout: 'castle',
     difficulty: 'hard',
     chapterId: 'chapter-starlit-canopy',
     order: 17,
@@ -653,7 +839,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'comet-boulevard-18',
     name: '彗尾大道',
-    layout: 'stack60',
+    layout: 'rocket',
     difficulty: 'hard',
     chapterId: 'chapter-starlit-canopy',
     order: 18,
@@ -666,7 +852,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'aurora-nursery-19',
     name: '极光苗圃',
-    layout: 'stack72',
+    layout: 'key',
     difficulty: 'hard',
     chapterId: 'chapter-starlit-canopy',
     order: 19,
@@ -679,7 +865,7 @@ const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
   createLevelBlueprint({
     id: 'dream-bloom-20',
     name: '梦绽穹庭',
-    layout: 'stack84',
+    layout: 'dragon-head',
     difficulty: 'hard',
     chapterId: 'chapter-starlit-canopy',
     order: 20,
