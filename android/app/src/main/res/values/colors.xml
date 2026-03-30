@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <color name="shell_background">#FFF8EE</color>
+  <color name="shell_surface">#FFFFFFFF</color>
+  <color name="shell_surface_alt">#FFF6D7A6</color>
+  <color name="shell_accent">#FFEF7A1A</color>
+  <color name="shell_text">#FF2F241C</color>
+  <color name="shell_muted">#FF7B6758</color>
+  <color name="shell_error">#FFC85757</color>
+  <color name="launcher_background">#FFF6B34A</color>
+</resources>

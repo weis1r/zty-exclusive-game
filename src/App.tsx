@@ -128,33 +128,6 @@ const CHAPTER_AVATAR_THEMES: Record<string, ChapterAvatarTheme> = {
     roleName: '镜庭引路人',
     roleTag: '幻彩镜庭向导',
   },
-  'chapter-sunset-orchard': {
-    avatar: avatarBloomScout,
-    ribbon: sparkRibbon,
-    sticker: gardenStickerPack,
-    accent: '#ff9c62',
-    accentSoft: '#ffe7c2',
-    roleName: '晚照小园丁',
-    roleTag: '果园热身领路员',
-  },
-  'chapter-verdant-lab': {
-    avatar: avatarMirrorGuide,
-    ribbon: sparkRibbon,
-    sticker: gardenStickerPack,
-    accent: '#53c79c',
-    accentSoft: '#d6fff1',
-    roleName: '藤影研究员',
-    roleTag: '翠影工房调色师',
-  },
-  'chapter-starlit-canopy': {
-    avatar: avatarMirrorGuide,
-    ribbon: sparkRibbon,
-    sticker: gardenStickerPack,
-    accent: '#8f92ff',
-    accentSoft: '#f0dcff',
-    roleName: '星幕指挥官',
-    roleTag: '秘苑终章向导',
-  },
 }
 
 const DEFAULT_CHAPTER_AVATAR_THEME = CHAPTER_AVATAR_THEMES['chapter-bloom-path']
@@ -187,30 +160,6 @@ const CHAPTER_GAME_AVATAR_SPECS: Record<string, ChapterGameAvatarSpec> = {
     ring: '#d6ebff',
     blush: '#ffbfd7',
   },
-  'chapter-sunset-orchard': {
-    skin: '#ffe0c8',
-    hair: '#ff9b57',
-    accent: '#ffd35d',
-    outfit: '#ff8d5f',
-    ring: '#ffe5bf',
-    blush: '#ffc19a',
-  },
-  'chapter-verdant-lab': {
-    skin: '#f6decf',
-    hair: '#2fa878',
-    accent: '#9ee6b9',
-    outfit: '#36be8f',
-    ring: '#d5fff2',
-    blush: '#f2bcb2',
-  },
-  'chapter-starlit-canopy': {
-    skin: '#ffe3d8',
-    hair: '#7f8fff',
-    accent: '#ffb6ed',
-    outfit: '#676fdd',
-    ring: '#e5e4ff',
-    blush: '#ffc1d8',
-  },
 }
 
 const DEFAULT_CHAPTER_GAME_AVATAR_SPEC = CHAPTER_GAME_AVATAR_SPECS['chapter-bloom-path']
@@ -219,9 +168,7 @@ interface TileMascotSpec {
   skin: string
   fringe: string
   accent: string
-  accentSoft: string
   blush: string
-  outfit: string
   eyes: 'bright' | 'smile' | 'sleepy' | 'wink' | 'gentle'
   mouth: 'open' | 'smile' | 'cat' | 'tiny'
   brows: 'bold' | 'cheer' | 'sleepy' | 'spark' | 'soft'
@@ -230,108 +177,88 @@ interface TileMascotSpec {
 const TILE_MASCOT_SPECS: Record<TileType, TileMascotSpec> = {
   ember: {
     skin: '#ffe6c7',
-    fringe: '#ff7d29',
-    accent: '#ff5d42',
-    accentSoft: '#ffd39f',
+    fringe: '#ff994d',
+    accent: '#ff6b4d',
     blush: '#ffb49f',
-    outfit: '#ff8e43',
     eyes: 'bright',
     mouth: 'open',
     brows: 'bold',
   },
   leaf: {
     skin: '#fff0dc',
-    fringe: '#53c736',
-    accent: '#b9f97c',
-    accentSoft: '#e6ffb8',
+    fringe: '#6dcf7c',
+    accent: '#98ec9e',
     blush: '#f4c6a4',
-    outfit: '#68c843',
     eyes: 'smile',
     mouth: 'smile',
     brows: 'cheer',
   },
   bloom: {
     skin: '#fff0e2',
-    fringe: '#ff5fa8',
-    accent: '#ffb6de',
-    accentSoft: '#ffd6ea',
+    fringe: '#ff8fba',
+    accent: '#ffc1de',
     blush: '#ffbfd3',
-    outfit: '#ff78ad',
     eyes: 'bright',
     mouth: 'smile',
     brows: 'spark',
   },
   bell: {
     skin: '#fff0c9',
-    fringe: '#ffc730',
-    accent: '#fff09a',
-    accentSoft: '#fff5b8',
+    fringe: '#ffcb56',
+    accent: '#ffe69f',
     blush: '#f9c18f',
-    outfit: '#f8ca42',
     eyes: 'gentle',
     mouth: 'open',
     brows: 'soft',
   },
   cloud: {
     skin: '#f8f5ff',
-    fringe: '#6a91ff',
-    accent: '#d9e5ff',
-    accentSoft: '#eef3ff',
-    blush: '#ced4ff',
-    outfit: '#6f86ff',
+    fringe: '#8fc7ff',
+    accent: '#dff2ff',
+    blush: '#d9caf7',
     eyes: 'sleepy',
     mouth: 'tiny',
     brows: 'sleepy',
   },
   shell: {
     skin: '#fff4e7',
-    fringe: '#2fc9af',
-    accent: '#b2f7e8',
-    accentSoft: '#dbfff6',
+    fringe: '#7fd7ca',
+    accent: '#b4f1e7',
     blush: '#f4c6bf',
-    outfit: '#40cdb6',
     eyes: 'gentle',
     mouth: 'cat',
     brows: 'soft',
   },
   berry: {
     skin: '#fff0f6',
-    fringe: '#9559ff',
-    accent: '#edbcff',
-    accentSoft: '#f3dbff',
+    fringe: '#c57bff',
+    accent: '#efc9ff',
     blush: '#ffc0dc',
-    outfit: '#a26aff',
     eyes: 'wink',
     mouth: 'smile',
     brows: 'spark',
   },
   pine: {
     skin: '#eef8e8',
-    fringe: '#16925d',
-    accent: '#9de0ac',
-    accentSoft: '#d8f2c7',
-    blush: '#b7d29d',
-    outfit: '#239765',
+    fringe: '#59bf8b',
+    accent: '#a2e7be',
+    blush: '#cadbaf',
     eyes: 'smile',
     mouth: 'cat',
     brows: 'cheer',
   },
   wave: {
     skin: '#eefcff',
-    fringe: '#17d3ff',
-    accent: '#97f5ff',
-    accentSoft: '#d0fbff',
-    blush: '#b5e8f0',
-    outfit: '#25cdea',
+    fringe: '#47c7e8',
+    accent: '#9ceffc',
+    blush: '#beddf0',
     eyes: 'gentle',
     mouth: 'smile',
     brows: 'soft',
   },
 }
 
-const TILE_MASCOT_INK = '#6a4b4b'
-const TILE_MASCOT_LINE_SOFT = 'rgba(106, 75, 75, 0.4)'
-const TILE_MASCOT_SKIN_SHADOW = 'rgba(118, 84, 78, 0.12)'
+const TILE_MASCOT_INK = '#5d403d'
 
 function getChapterGameAvatarSpec(chapterId?: string | null) {
   if (!chapterId) {
@@ -341,15 +268,23 @@ function getChapterGameAvatarSpec(chapterId?: string | null) {
   return CHAPTER_GAME_AVATAR_SPECS[chapterId] ?? DEFAULT_CHAPTER_GAME_AVATAR_SPEC
 }
 
-function renderPortraitSpark(cx: number, cy: number, stroke: string) {
-  return (
-    <g fill="none" stroke={stroke} strokeLinecap="round" strokeLinejoin="round">
-      <path d={`M${cx} ${cy - 5}v10`} strokeWidth="1.7" />
-      <path d={`M${cx - 5} ${cy}h10`} strokeWidth="1.7" />
-      <path d={`M${cx - 3.5} ${cy - 3.5}l7 7`} strokeWidth="1.1" />
-      <path d={`M${cx + 3.5} ${cy - 3.5}l-7 7`} strokeWidth="1.1" />
-    </g>
-  )
+function renderStarEye(cx: number, cy: number, fill = '#fff067') {
+  const points = [
+    [cx, cy - 4.8],
+    [cx + 1.5, cy - 1.7],
+    [cx + 5, cy - 1.1],
+    [cx + 2.2, cy + 1.1],
+    [cx + 3.1, cy + 4.7],
+    [cx, cy + 2.7],
+    [cx - 3.1, cy + 4.7],
+    [cx - 2.2, cy + 1.1],
+    [cx - 5, cy - 1.1],
+    [cx - 1.5, cy - 1.7],
+  ]
+    .map(([x, y]) => `${x},${y}`)
+    .join(' ')
+
+  return <polygon points={points} fill={fill} stroke={TILE_MASCOT_INK} strokeWidth="1.8" />
 }
 
 function renderTileMascotAccessory(tileType: TileType, spec: TileMascotSpec) {
@@ -357,46 +292,42 @@ function renderTileMascotAccessory(tileType: TileType, spec: TileMascotSpec) {
     case 'ember':
       return (
         <g
+          fill={spec.accent}
           stroke={TILE_MASCOT_INK}
-          strokeWidth="2.2"
+          strokeWidth="2.1"
           strokeLinejoin="round"
           strokeLinecap="round"
         >
           <path
-            d="M42 7c5.1 3.8 10.4 11.1 10.4 18.5 4.3 2.8 8.5 8.2 8.5 13.8-5.4-3.8-11.4-5.5-18.9-5.5-7.8 0-13.8 1.9-19.4 6 0-6 4-11.5 8.7-14.5 0-7.1 5.2-14.4 10.7-18.3Z"
-            fill={spec.accent}
+            d="M42 6c6 5 12 11 12 19 0 7-4.9 12.1-12 14.4-7.1-2.3-12-7.4-12-14.4 0-8 6-14 12-19Z"
           />
           <path
-            d="M42 13c3.4 3.2 6.6 7.3 6.6 11.9 0 2.7-.8 5-2.5 7.4-1.7-.4-3.3-.6-4.9-.6-1.8 0-3.5.2-5.3.7-1.6-2.3-2.3-4.7-2.3-7.4 0-4.7 3.1-8.6 8.4-12Z"
+            d="M42 16c3.7 3.6 7 7.1 7 11.8 0 4.3-2.8 7.5-7 9.2-4.2-1.7-7-4.9-7-9.2 0-4.7 3.3-8.2 7-11.8Z"
             fill={spec.fringe}
           />
         </g>
       )
     case 'leaf':
       return (
-        <g stroke={TILE_MASCOT_INK} strokeWidth="2.1" strokeLinecap="round">
+        <g stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinecap="round">
           <ellipse
-            cx="27"
-            cy="27"
-            rx="9"
-            ry="15"
-            transform="rotate(-34 27 27)"
+            cx="31"
+            cy="18"
+            rx="7.8"
+            ry="13"
+            transform="rotate(-28 31 18)"
             fill={spec.accent}
           />
           <ellipse
-            cx="57"
-            cy="27"
-            rx="9"
-            ry="15"
-            transform="rotate(34 57 27)"
+            cx="53"
+            cy="18"
+            rx="7.8"
+            ry="13"
+            transform="rotate(28 53 18)"
             fill={spec.fringe}
           />
           <path
-            d="M42 10c3.6 2.1 5.8 5.5 5.8 9.1-3.4-.4-5.4.8-5.8 4.1-1-3.5-3.1-4.7-6.7-4.2.1-3.4 2.8-6.8 6.7-9Z"
-            fill={spec.accentSoft}
-          />
-          <path
-            d="M42 17v11"
+            d="M42 18v12"
             fill="none"
             stroke="#5f955f"
             strokeWidth="2.4"
@@ -407,44 +338,43 @@ function renderTileMascotAccessory(tileType: TileType, spec: TileMascotSpec) {
     case 'bloom':
       return (
         <g stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="42" cy="14" r="7.2" fill={spec.accent} />
-          <circle cx="28" cy="21" r="6.8" fill={spec.accent} />
-          <circle cx="56" cy="21" r="6.8" fill={spec.accent} />
-          <circle cx="33" cy="33" r="6.6" fill={spec.accent} />
-          <circle cx="51" cy="33" r="6.6" fill={spec.accent} />
-          <circle cx="42" cy="24" r="5.8" fill={spec.fringe} />
+          <circle cx="42" cy="14" r="6.2" fill={spec.accent} />
+          <circle cx="30" cy="18" r="5.8" fill={spec.accent} />
+          <circle cx="54" cy="18" r="5.8" fill={spec.accent} />
+          <circle cx="34" cy="28" r="5.8" fill={spec.accent} />
+          <circle cx="50" cy="28" r="5.8" fill={spec.accent} />
+          <circle cx="42" cy="21" r="5.2" fill={spec.fringe} />
         </g>
       )
     case 'bell':
       return (
         <g stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M24 24c0-10.2 8.1-17.1 18-17.1S60 13.8 60 24v11H24Z" fill={spec.fringe} />
+          <path d="M31 14c0-6.2 22-6.2 22 0v9H31Z" fill={spec.fringe} />
           <path
-            d="M21 32c0-8.2 41.8-8.2 41.8 0 0 6.9-9 11.8-20.9 11.8S21 38.9 21 32Z"
+            d="M28 24c0-7.1 28-7.1 28 0 0 5.8-6.2 9.4-14 9.4S28 29.8 28 24Z"
             fill={spec.accent}
           />
-          <circle cx="42" cy="40" r="3.4" fill="#f5a23d" />
+          <circle cx="42" cy="31" r="3.1" fill="#f5a23d" />
         </g>
       )
     case 'cloud':
       return (
         <g stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="24" cy="27" r="8.6" fill={spec.accent} />
-          <circle cx="37" cy="18" r="10.8" fill={spec.accentSoft} />
-          <circle cx="50" cy="18" r="11.2" fill={spec.accent} />
-          <circle cx="61" cy="28" r="8.1" fill={spec.accentSoft} />
-          <ellipse cx="43" cy="31" rx="24" ry="10.5" fill={spec.fringe} />
+          <circle cx="30" cy="22" r="8.5" fill={spec.accent} />
+          <circle cx="42" cy="16" r="10.5" fill={spec.accent} />
+          <circle cx="54" cy="22" r="8.5" fill={spec.accent} />
+          <ellipse cx="42" cy="25" rx="20" ry="8.5" fill={spec.fringe} />
         </g>
       )
     case 'shell':
       return (
         <g stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path
-            d="M22 33c0-14.7 9.1-22.7 20-22.7S62 18.3 62 33H22Z"
+            d="M24 28c0-13 8.1-20 18-20s18 7 18 20H24Z"
             fill={spec.fringe}
           />
           <path
-            d="M27 33V19M35 33V15M42 33V13M49 33V15M57 33V19"
+            d="M29 28V17M36 28V13M42 28V11M48 28V13M55 28V17"
             fill="none"
             stroke={spec.accent}
             strokeWidth="2.2"
@@ -455,10 +385,10 @@ function renderTileMascotAccessory(tileType: TileType, spec: TileMascotSpec) {
     case 'berry':
       return (
         <g stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="30" cy="21" r="8.8" fill={spec.fringe} />
-          <circle cx="54" cy="21" r="8.8" fill={spec.fringe} />
+          <circle cx="33" cy="18" r="7" fill={spec.fringe} />
+          <circle cx="51" cy="18" r="7" fill={spec.fringe} />
           <path
-            d="M42 14c-5.2-8.4-13-8-13-8 3.2 4.7 4.6 8.8 4.6 8.8M42 14c5.2-8.4 13-8 13-8-3.2 4.7-4.6 8.8-4.6 8.8"
+            d="M42 16c-5-8-12-7-12-7 3 4 4.5 8.2 4.5 8.2M42 16c5-8 12-7 12-7-3 4-4.5 8.2-4.5 8.2"
             fill="none"
             stroke={spec.accent}
             strokeWidth="2.3"
@@ -470,255 +400,20 @@ function renderTileMascotAccessory(tileType: TileType, spec: TileMascotSpec) {
     case 'pine':
       return (
         <g stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M42 6 31 22h22Z" fill={spec.accent} />
-          <path d="M42 12 26 33h32Z" fill={spec.fringe} />
-          <path d="M42 31v8" fill="none" stroke="#5b876c" strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M42 8 32 22h20Z" fill={spec.accent} />
+          <path d="M42 14 28 31h28Z" fill={spec.fringe} />
+          <path d="M42 30v8" fill="none" stroke="#5b876c" strokeWidth="2.4" strokeLinecap="round" />
         </g>
       )
     case 'wave':
       return (
         <g stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path
-            d="M20 30c7.8-15.2 24.4-18.4 37.8-10.1-8.5.6-13.9 4.5-13.9 10 0 4.3 3.6 8 9.3 9.5-10.9 5.5-24.1 4.3-33-2.4-4.4-3.3-4.2-4.7-.2-7Z"
+            d="M25 22c7-11 20-14 31-8-5 .7-8.3 3.8-8.3 8.1 0 4.5 4.1 7.9 10.3 8.6-8.3 6.8-20.7 6.5-29.4 1.1-6.5-4.1-8.2-7.2-3.6-9.8Z"
             fill={spec.fringe}
           />
-          <circle cx="58" cy="19" r="5.8" fill={spec.accentSoft} />
+          <circle cx="56" cy="18" r="5.7" fill={spec.accent} />
         </g>
-      )
-  }
-}
-
-function renderTileMascotHeadBase(tileType: TileType, spec: TileMascotSpec) {
-  const sharedProps = {
-    fill: spec.skin,
-    stroke: TILE_MASCOT_INK,
-    strokeWidth: 2.4,
-    strokeLinejoin: 'round' as const,
-  }
-
-  switch (tileType) {
-    case 'ember':
-      return (
-        <path
-          d="M22.5 41.5c0-13.8 8.7-23.7 19.5-23.7s19.5 9.9 19.5 23.7c0 12.8-8.3 21.8-19.5 21.8s-19.5-9-19.5-21.8Z"
-          {...sharedProps}
-        />
-      )
-    case 'leaf':
-      return (
-        <path
-          d="M24 39.5c0-13 7.9-22.3 18.2-22.3 11.4 0 19.2 10 19.2 23.6 0 12.9-8.1 22.1-19.4 22.1-10.4 0-18-9.6-18-23.4Z"
-          {...sharedProps}
-        />
-      )
-    case 'bloom':
-      return <ellipse cx="42" cy="42.5" rx="20.5" ry="21.7" {...sharedProps} />
-    case 'bell':
-      return (
-        <path
-          d="M23 41.2c0-13.4 8.8-22.8 19-22.8 10.8 0 19 9.8 19 22.8 0 12.1-8.4 20.6-19 20.6-10.4 0-19-8.5-19-20.6Z"
-          {...sharedProps}
-        />
-      )
-    case 'cloud':
-      return (
-        <path
-          d="M24 48c-1.3-10.6 4.6-18.9 12.8-21.4 3-5.2 8-8.4 13.8-8.4 10.1 0 17.8 9.1 17.8 20.9 0 13.7-10.6 24-23.4 24-10.5 0-19.2-6.4-21-15.1Z"
-          {...sharedProps}
-        />
-      )
-    case 'shell':
-      return (
-        <path
-          d="M20.8 43.2c0-13 9.4-22 21.2-22s21.2 9 21.2 22c0 11.7-8.7 20.4-21.2 20.4s-21.2-8.7-21.2-20.4Z"
-          {...sharedProps}
-        />
-      )
-    case 'berry':
-      return <ellipse cx="42" cy="43.2" rx="19.8" ry="21.3" {...sharedProps} />
-    case 'pine':
-      return <ellipse cx="42" cy="43.4" rx="18.2" ry="22.8" {...sharedProps} />
-    case 'wave':
-      return (
-        <path
-          d="M22 43c0-13.4 8.8-22 20.4-22 11.8 0 20.6 8.6 20.6 22 0 12.5-8.8 21.6-20.6 21.6-11.6 0-20.4-9.1-20.4-21.6Z"
-          {...sharedProps}
-        />
-      )
-  }
-}
-
-function renderTileMascotFringe(tileType: TileType, spec: TileMascotSpec) {
-  switch (tileType) {
-    case 'ember':
-      return (
-        <path
-          d="M22 38.5c3.3-13.5 12.1-21.2 20-21.2 8.4 0 16.2 4.7 20.8 16.6-5.4-2.2-11.1-3.5-18-3.5-8.9 0-15.4 2.5-22.8 8.1Z"
-          fill={spec.fringe}
-          stroke={TILE_MASCOT_INK}
-          strokeWidth="2.3"
-          strokeLinejoin="round"
-        />
-      )
-    case 'leaf':
-      return (
-        <path
-          d="M24.5 35.8c4.7-9.8 11.1-15.3 18.3-15.3 7.2 0 13.7 4.8 18.1 14.2-5.8-3.6-11.8-5-18.2-5-6.8 0-12.6 1.7-18.2 6.1Z"
-          fill={spec.fringe}
-          stroke={TILE_MASCOT_INK}
-          strokeWidth="2.3"
-          strokeLinejoin="round"
-        />
-      )
-    case 'bloom':
-      return (
-        <path
-          d="M22 37.5c4.3-11.5 11.8-17.4 20-17.4 7.9 0 15.8 5.3 20.7 15.5-7.8-4.7-13.4-5.8-20.5-5.8-7.4 0-13.1 1.7-20.2 7.7Z"
-          fill={spec.fringe}
-          stroke={TILE_MASCOT_INK}
-          strokeWidth="2.2"
-          strokeLinejoin="round"
-        />
-      )
-    case 'bell':
-      return (
-        <path
-          d="M23 35.4c3.8-10.9 10.5-16.8 19-16.8 8.5 0 15.1 5.8 19 16.8-7.2-4.3-12.7-5.5-19-5.5-6.2 0-11.7 1.2-19 5.5Z"
-          fill={spec.accentSoft}
-          stroke={TILE_MASCOT_INK}
-          strokeWidth="2.2"
-          strokeLinejoin="round"
-        />
-      )
-    case 'cloud':
-      return (
-        <path
-          d="M22 40c2.9-10.7 11-17.1 20.8-17.1 8.7 0 16.4 5.1 20.6 13.9-8.1-3.5-12.9-4.3-19.9-4.3-7.5 0-13.1 1.4-21.5 7.5Z"
-          fill={spec.fringe}
-          stroke={TILE_MASCOT_INK}
-          strokeWidth="2.2"
-          strokeLinejoin="round"
-        />
-      )
-    case 'shell':
-      return (
-        <path
-          d="M20.8 39.2c3-10.8 12-16.9 21.2-16.9 9.1 0 18.2 6.1 21.2 16.9-7.2-4-13.5-5.3-21.2-5.3-7.8 0-14 1.3-21.2 5.3Z"
-          fill={spec.accentSoft}
-          stroke={TILE_MASCOT_INK}
-          strokeWidth="2.3"
-          strokeLinejoin="round"
-        />
-      )
-    case 'berry':
-      return (
-        <path
-          d="M22.5 38.8c3.8-11.2 11.5-17.7 19.5-17.7 7.8 0 15.6 5.6 19.6 16-6.1-3.1-11.6-4.1-18.4-4.1-7.9 0-12.9 1.5-20.7 5.8Z"
-          fill={spec.fringe}
-          stroke={TILE_MASCOT_INK}
-          strokeWidth="2.3"
-          strokeLinejoin="round"
-        />
-      )
-    case 'pine':
-      return (
-        <path
-          d="M24 38.6c3.1-10.3 10.3-15.9 18-15.9 8.5 0 15.4 5.7 18.7 17.1-6.6-3.6-11.5-4.6-18.4-4.6-7 0-11.9 1.1-18.3 3.4Z"
-          fill={spec.fringe}
-          stroke={TILE_MASCOT_INK}
-          strokeWidth="2.3"
-          strokeLinejoin="round"
-        />
-      )
-    case 'wave':
-      return (
-        <path
-          d="M20.8 39.2c6.1-11.4 12.5-17.2 21.2-17.2 7 0 14.3 4.1 20.2 12.3-6.8-2.3-11.7-3-18.4-3-8 0-14.1 1.5-23 7.9Z"
-          fill={spec.fringe}
-          stroke={TILE_MASCOT_INK}
-          strokeWidth="2.3"
-          strokeLinejoin="round"
-        />
-      )
-  }
-}
-
-function renderTileMascotBodyTrim(tileType: TileType, spec: TileMascotSpec) {
-  switch (tileType) {
-    case 'ember':
-      return (
-        <path
-          d="M42 68c2 1.7 3.8 4.1 3.8 6.5 0 2-1.2 3.7-3.8 4.9-2.6-1.2-3.8-2.9-3.8-4.9 0-2.4 1.8-4.8 3.8-6.5Z"
-          fill={spec.accentSoft}
-          stroke={TILE_MASCOT_INK}
-          strokeWidth="1.8"
-          strokeLinejoin="round"
-        />
-      )
-    case 'leaf':
-      return (
-        <g stroke={TILE_MASCOT_INK} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <ellipse cx="37" cy="74" rx="3.8" ry="6" transform="rotate(-28 37 74)" fill={spec.accentSoft} />
-          <ellipse cx="47" cy="74" rx="3.8" ry="6" transform="rotate(28 47 74)" fill={spec.accent} />
-        </g>
-      )
-    case 'bloom':
-      return (
-        <g stroke={TILE_MASCOT_INK} strokeWidth="1.6" strokeLinejoin="round">
-          <circle cx="42" cy="74" r="3" fill={spec.fringe} />
-          <circle cx="37.3" cy="74" r="2.1" fill={spec.accentSoft} />
-          <circle cx="46.7" cy="74" r="2.1" fill={spec.accentSoft} />
-          <circle cx="42" cy="69.4" r="2.1" fill={spec.accentSoft} />
-          <circle cx="42" cy="78.6" r="2.1" fill={spec.accentSoft} />
-        </g>
-      )
-    case 'bell':
-      return (
-        <g stroke={TILE_MASCOT_INK} strokeWidth="1.8" strokeLinejoin="round">
-          <path d="M37 72c0-3.4 10-3.4 10 0v4H37Z" fill={spec.accentSoft} />
-          <path d="M35 76c0-3.9 14-3.9 14 0 0 2.7-3.2 4.5-7 4.5S35 78.7 35 76Z" fill={spec.accent} />
-        </g>
-      )
-    case 'cloud':
-      return (
-        <g stroke={TILE_MASCOT_INK} strokeWidth="1.6" strokeLinejoin="round">
-          <circle cx="37" cy="75" r="3" fill={spec.accentSoft} />
-          <circle cx="42" cy="72.4" r="4" fill={spec.accent} />
-          <circle cx="47.2" cy="75" r="3.2" fill={spec.accentSoft} />
-          <ellipse cx="42" cy="76.6" rx="8" ry="3.4" fill={spec.fringe} />
-        </g>
-      )
-    case 'shell':
-      return (
-        <g stroke={TILE_MASCOT_INK} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M35 79c0-5.3 3.2-8.4 7-8.4s7 3.1 7 8.4H35Z" fill={spec.accentSoft} />
-          <path d="M38 79v-4.8M42 79v-6.2M46 79v-4.8" fill="none" stroke={spec.fringe} />
-        </g>
-      )
-    case 'berry':
-      return (
-        <g stroke={TILE_MASCOT_INK} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="38" cy="74" r="3.8" fill={spec.fringe} />
-          <circle cx="46" cy="74" r="3.8" fill={spec.fringe} />
-          <path d="M42 72c-2.1-4-5.7-4.4-5.7-4.4M42 72c2.1-4 5.7-4.4 5.7-4.4" fill="none" stroke={spec.accent} />
-        </g>
-      )
-    case 'pine':
-      return (
-        <g stroke={TILE_MASCOT_INK} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M42 68 37 75h10Z" fill={spec.accentSoft} />
-          <path d="M42 71 34 80h16Z" fill={spec.accent} />
-        </g>
-      )
-    case 'wave':
-      return (
-        <path
-          d="M34 76c3.3-5.6 8.8-7.4 14.4-4.1-2.8.4-4.5 2-4.5 4.1 0 2.3 1.9 4.1 5.2 4.5-4.1 3.1-10 2.8-14.2-.1-2.6-1.8-3.3-3-.9-4.4Z"
-          fill={spec.accentSoft}
-          stroke={TILE_MASCOT_INK}
-          strokeWidth="1.8"
-          strokeLinejoin="round"
-        />
       )
   }
 }
@@ -764,8 +459,20 @@ function renderTileMascotMoodDecor(mood: TileMascotMood, theme: TileTheme) {
     case 'burst':
       return (
         <>
-          {renderPortraitSpark(21, 30, theme.accent)}
-          {renderPortraitSpark(67, 28, '#fff3b0')}
+          <path
+            d="M18 21 23 26 30 24 27 31 31 38 24 36 19 42 18 34 11 31 18 28 18 21Z"
+            fill={theme.accent}
+            stroke={TILE_MASCOT_INK}
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M66 18 70 24 77 23 73 29 77 35 70 34 66 40 65 32 58 29 65 26 66 18Z"
+            fill="#fff4a8"
+            stroke={TILE_MASCOT_INK}
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
         </>
       )
     default:
@@ -773,476 +480,158 @@ function renderTileMascotMoodDecor(mood: TileMascotMood, theme: TileTheme) {
   }
 }
 
-function renderPortraitComplexion(mood: TileMascotMood) {
-  const cheekOpacity =
-    mood === 'burst' ? 0.18 : mood === 'board-hinted' ? 0.14 : mood === 'tray' ? 0.1 : 0.12
-
-  return (
-    <>
-      <path
-        d="M26.6 45.2c1.8 7.6 7 12.6 15 15-8.8 0-15.6-5.2-17.5-13-.5-2.3-.4-4.3.5-6Z"
-        fill={TILE_MASCOT_SKIN_SHADOW}
-      />
-      <path
-        d="M54.4 30.2c5.5 3.1 8.8 8.8 8.8 16.2 0 9.7-6 15.9-17.8 18.9 7.9-.2 14-3.7 17.4-10.3 3.1-6 3.3-12.4.5-18.8-1.4-2.9-3.4-5-6.3-6Z"
-        fill="rgba(255,255,255,0.18)"
-      />
-      <ellipse cx="31.2" cy="47.9" rx="3.2" ry="2.1" fill={`rgba(208, 128, 120, ${cheekOpacity})`} />
-      <ellipse
-        cx="53.4"
-        cy="47.5"
-        rx="3.4"
-        ry="2"
-        fill={`rgba(208, 128, 120, ${(cheekOpacity * 0.82).toFixed(2)})`}
-      />
-      <path
-        d="M33.4 35.2c2.1-1.7 4.6-2.4 7.4-2.1"
-        fill="none"
-        stroke="rgba(255,255,255,0.16)"
-        strokeWidth="1.35"
-        strokeLinecap="round"
-      />
-    </>
-  )
-}
-
-function renderPortraitEye(
-  cx: number,
-  cy: number,
-  variant: 'almond' | 'wide' | 'smile' | 'sleepy' | 'wink',
-  pupilShiftX = 0,
-) {
-  switch (variant) {
-    case 'smile':
+function renderTileMascotActiveFace(tileType: TileType) {
+  switch (tileType) {
+    case 'ember':
       return (
         <>
-          <path
-            d={`M${cx - 4.1} ${cy + 0.5}c1.8-1.7 5.9-1.7 7.8 0`}
-            fill="none"
-            stroke={TILE_MASCOT_INK}
-            strokeWidth="1.55"
-            strokeLinecap="round"
-          />
-          <path
-            d={`M${cx - 2.8} ${cy + 1.1}c1.2.5 3.2.5 4.5 0`}
-            fill="none"
-            stroke={TILE_MASCOT_LINE_SOFT}
-            strokeWidth="0.9"
-            strokeLinecap="round"
-          />
+          <path d="M27 31c4.2-2.9 8-3.5 11.7-2" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.8" strokeLinecap="round" />
+          <path d="M47 30c3.8-.7 7 .1 10 2.8" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.8" strokeLinecap="round" />
+          <ellipse cx="33.4" cy="39.5" rx="2.7" ry="3.3" fill="#4f2f4d" />
+          <path d="M47 39c2.2-2.6 5.5-2.8 7.6-.3" fill="none" stroke="#4f2f4d" strokeWidth="2.7" strokeLinecap="round" />
+          <path d="M35 51c4.4-3.2 10.1-2.7 14 1" fill="none" stroke="#8f4c61" strokeWidth="3" strokeLinecap="round" />
+          <path d="M45 51.5c1.2 2.8 3.5 4 6 3.1" fill="none" stroke="#8f4c61" strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M49 54c.2 2.1-.6 3.8-2.1 5" fill="none" stroke="#ff8c79" strokeWidth="2.4" strokeLinecap="round" />
         </>
       )
-    case 'sleepy':
+    case 'leaf':
       return (
         <>
-          <path
-            d={`M${cx - 4.3} ${cy + 0.3}c1.9-1.9 6.5-1.9 8.6 0`}
-            fill="#fffdfa"
-            stroke="rgba(106,75,75,0.32)"
-            strokeWidth="0.95"
-            strokeLinejoin="round"
-          />
-          <path
-            d={`M${cx - 4.2} ${cy + 0.1}c2.1-1.4 6.2-1.4 8.4 0`}
-            fill="none"
-            stroke={TILE_MASCOT_INK}
-            strokeWidth="1.15"
-            strokeLinecap="round"
-          />
-          <ellipse cx={cx + pupilShiftX} cy={cy + 0.8} rx="1.1" ry="1.35" fill="#46323c" />
+          <path d="M29 30.5c2.7-1.4 5.9-1 8.5 1" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
+          <path d="M46 30c2.9-1.8 6.5-1.7 9.5.4" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
+          <path d="M29 40c2.1-2.7 5.2-2.7 7.3 0" fill="none" stroke="#4f2f4d" strokeWidth="2.7" strokeLinecap="round" />
+          <path d="M47 40c2.1-2.7 5.2-2.7 7.3 0" fill="none" stroke="#4f2f4d" strokeWidth="2.7" strokeLinecap="round" />
+          <path d="M35 49.5c2.3 2.3 4.4 3.4 7 4.1 2.6-.7 4.7-1.8 7-4.1" fill="none" stroke="#8f4c61" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
         </>
       )
-    case 'wink':
+    case 'bloom':
       return (
         <>
-          <path
-            d={`M${cx - 3.9} ${cy + 0.4}c1.8-1.3 5.7-1.3 7.4 0`}
-            fill="none"
-            stroke={TILE_MASCOT_INK}
-            strokeWidth="1.45"
-            strokeLinecap="round"
-          />
-          <path
-            d={`M${cx - 2.3} ${cy + 1}c.9.4 2.4.4 3.3 0`}
-            fill="none"
-            stroke={TILE_MASCOT_LINE_SOFT}
-            strokeWidth="0.85"
-            strokeLinecap="round"
-          />
+          <path d="M28 30.5c3.5-3 7.2-3.2 10.8-.6" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.4" strokeLinecap="round" />
+          <path d="M47 30.5c3.1-2.2 6.3-2.1 9.6.2" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.4" strokeLinecap="round" />
+          <ellipse cx="34" cy="39.4" rx="2.7" ry="2.4" fill="#4f2f4d" />
+          <ellipse cx="51.4" cy="39.4" rx="2.7" ry="2.4" fill="#4f2f4d" />
+          <path d="M35 51c3-1.6 5.5-2.2 7.8-2.2 2.8 0 5.2.8 7.1 2.7" fill="none" stroke="#8f4c61" strokeWidth="2.8" strokeLinecap="round" />
+          <circle cx="54.8" cy="44.2" r="1.1" fill="#4f2f4d" />
         </>
       )
-    case 'wide':
-    case 'almond':
-    default: {
-      const isWide = variant === 'wide'
-      const rx = isWide ? 4.15 : 3.9
-      const ry = isWide ? 2.35 : 2.05
-      const upperArch = isWide ? 2.65 : 2.2
-
+    case 'bell':
       return (
         <>
-          <ellipse
-            cx={cx}
-            cy={cy + 0.55}
-            rx={rx}
-            ry={ry}
-            fill="#fffdfa"
-            stroke="rgba(106,75,75,0.32)"
-            strokeWidth="0.95"
-          />
-          <path
-            d={`M${cx - rx} ${cy + 0.15}c1.9-${upperArch} 6.2-${upperArch} ${rx * 2} 0`}
-            fill="none"
-            stroke={TILE_MASCOT_INK}
-            strokeWidth={isWide ? '1.25' : '1.18'}
-            strokeLinecap="round"
-          />
-          <ellipse
-            cx={cx + pupilShiftX}
-            cy={cy + 0.75}
-            rx={isWide ? 1.4 : 1.2}
-            ry={isWide ? 1.65 : 1.45}
-            fill="#48333a"
-          />
-          <circle
-            cx={cx + pupilShiftX + 0.42}
-            cy={cy + 0.2}
-            r="0.42"
-            fill="rgba(255,255,255,0.88)"
-          />
+          <path d="M29 31c3-1.8 6.6-1.9 9.6-.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
+          <path d="M46 31c3-1.8 6.6-1.9 9.6-.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
+          <ellipse cx="33.2" cy="39.5" rx="3.1" ry="3.5" fill="#4f2f4d" />
+          <ellipse cx="50.8" cy="39.5" rx="3.1" ry="3.5" fill="#4f2f4d" />
+          <path d="M35 50c2 4.2 12 4.2 14 0" fill="#fff4ef" stroke="#8f4c61" strokeWidth="2.5" strokeLinejoin="round" />
         </>
       )
-    }
-  }
-}
-
-function renderActivePortraitBrows(style: TileMascotSpec['brows']) {
-  switch (style) {
-    case 'bold':
+    case 'cloud':
       return (
         <>
-          <path d="M29.3 33.1c2.2-1.6 5-2.1 7.9-1.4" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="1.55" strokeLinecap="round" />
-          <path d="M47 31.7c2.4-1 5-.7 7.4.9" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="1.55" strokeLinecap="round" />
+          <path d="M29 31.8c2.5-1 5.3-.9 8.2 0" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="2.8" strokeLinecap="round" />
+          <path d="M46 31.2c2.8-1.2 5.8-.8 8.6.7" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="2.8" strokeLinecap="round" />
+          <path d="M29.5 40.4c2.1-1.5 4.7-1.5 6.8 0" fill="none" stroke="#4f2f4d" strokeWidth="2.5" strokeLinecap="round" />
+          <ellipse cx="50.8" cy="39.8" rx="2.6" ry="2.2" fill="#4f2f4d" />
+          <path d="M38 50.4c2.8-.9 5.3-.7 7.6 1" fill="none" stroke="#8f4c61" strokeWidth="2.7" strokeLinecap="round" />
         </>
       )
-    case 'cheer':
+    case 'shell':
       return (
         <>
-          <path d="M29.9 33.5c2.1-1 4.7-1.1 7.2-.2" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="1.4" strokeLinecap="round" />
-          <path d="M46.7 33c2.2-1 4.8-.9 7.2.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M28 31.2c3-1.6 6.2-1.2 9 .7" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
+          <path d="M47 29.8c3.7-2 6.8-1.6 9.4 1" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
+          <ellipse cx="33.2" cy="39.5" rx="2.7" ry="2.2" fill="#4f2f4d" />
+          <path d="M47 40c2.2-2.1 5-2.1 7.2 0" fill="none" stroke="#4f2f4d" strokeWidth="2.7" strokeLinecap="round" />
+          <path d="M35 49.8c2.2 2 4 2.9 7 3.6 2.1-.6 4.2-1.6 7-3.6" fill="none" stroke="#8f4c61" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
         </>
       )
-    case 'sleepy':
+    case 'berry':
       return (
         <>
-          <path d="M30.1 34c2.3-.5 4.8-.4 7 .2" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="1.25" strokeLinecap="round" />
-          <path d="M46.8 33.9c2.1-.5 4.5-.4 6.9.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="1.25" strokeLinecap="round" />
+          <path d="M28 30.2c3.7-2.8 7.2-3.1 10.4-.8" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.4" strokeLinecap="round" />
+          <path d="M47 31.3c2.9-1.8 6.2-1.5 9.1.8" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.4" strokeLinecap="round" />
+          <circle cx="33" cy="39.3" r="2.7" fill="#4f2f4d" />
+          <path d="M47.2 39.5c2.1-2.6 5.2-2.6 7.1-.2" fill="none" stroke="#4f2f4d" strokeWidth="2.6" strokeLinecap="round" />
+          <path d="M36 49.8c3.8 1.9 7.4 1.8 11.1-.3" fill="none" stroke="#8f4c61" strokeWidth="2.7" strokeLinecap="round" />
+          <path d="M48 50.6c1.9 1.4 2.3 3.5 1.4 5.6" fill="none" stroke="#ff7c97" strokeWidth="2.5" strokeLinecap="round" />
         </>
       )
-    case 'spark':
+    case 'pine':
       return (
         <>
-          <path d="M29.5 32.5c2.2-1.7 4.9-2.1 7.6-1" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="1.45" strokeLinecap="round" />
-          <path d="M46.9 32c2.4-1.2 5-.9 7.2.8" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="1.45" strokeLinecap="round" />
+          <path d="M28.5 31.2c2.6-1.7 5.8-1.4 8.6.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
+          <path d="M47 30.5c2.6-2 5.8-2 8.7-.1" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
+          <circle cx="33.2" cy="39.5" r="2.5" fill="#4f2f4d" />
+          <circle cx="50.8" cy="40.6" r="2.1" fill="#4f2f4d" />
+          <path d="M34.4 50.2c2 3.8 13.2 3.8 15.2 0v2.6c0 2.1-3 4.4-7.6 4.4-4.6 0-7.6-2.3-7.6-4.4v-2.6Z" fill="#fff6ee" stroke="#8f4c61" strokeWidth="2.4" strokeLinejoin="round" />
+          <path d="M39.7 50.2v5.1M44.3 50.2v5.1" fill="none" stroke="#8f4c61" strokeWidth="1.8" strokeLinecap="round" />
         </>
       )
-    case 'soft':
-    default:
+    case 'wave':
       return (
         <>
-          <path d="M29.9 33.6c2-.9 4.6-1 7-.2" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="1.35" strokeLinecap="round" />
-          <path d="M46.8 33.4c2-.8 4.5-.7 6.9.4" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="1.35" strokeLinecap="round" />
+          <path d="M28.5 31.7c2.6-1.3 5.3-1.4 8.2-.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3" strokeLinecap="round" />
+          <path d="M46.5 31c3-1.8 6.1-1.5 8.8.8" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3" strokeLinecap="round" />
+          <ellipse cx="33.2" cy="39.7" rx="2.8" ry="2.3" fill="#4f2f4d" />
+          <ellipse cx="50.8" cy="39.7" rx="2.8" ry="2.3" fill="#4f2f4d" />
+          <path d="M35.2 50.8c4.2-2.6 8.8-2.3 12.8.9" fill="none" stroke="#8f4c61" strokeWidth="2.8" strokeLinecap="round" />
         </>
       )
   }
 }
 
-function renderActivePortraitEyes(style: TileMascotSpec['eyes']) {
-  switch (style) {
-    case 'smile':
-      return (
-        <>
-          {renderPortraitEye(33.6, 39.5, 'smile')}
-          {renderPortraitEye(50.6, 39.5, 'smile')}
-        </>
-      )
-    case 'sleepy':
-      return (
-        <>
-          {renderPortraitEye(33.6, 39.8, 'sleepy', -0.3)}
-          {renderPortraitEye(50.6, 39.8, 'sleepy', 0.2)}
-        </>
-      )
-    case 'wink':
-      return (
-        <>
-          {renderPortraitEye(33.6, 39.4, 'wink')}
-          {renderPortraitEye(50.6, 39.4, 'almond', 0.2)}
-        </>
-      )
-    case 'gentle':
-      return (
-        <>
-          {renderPortraitEye(33.6, 39.5, 'almond', -0.2)}
-          {renderPortraitEye(50.6, 39.5, 'almond', 0.1)}
-        </>
-      )
-    case 'bright':
-    default:
-      return (
-        <>
-          {renderPortraitEye(33.6, 39.3, 'wide')}
-          {renderPortraitEye(50.6, 39.3, 'wide')}
-        </>
-      )
-  }
-}
-
-function renderPortraitNose() {
-  return (
-    <>
-      <path
-        d="M42.1 42.1c-.9 2-.8 4.2.5 6.3"
-        fill="none"
-        stroke="#b07f76"
-        strokeWidth="1.15"
-        strokeLinecap="round"
-      />
-      <path
-        d="M40.9 48.6c.8.9 1.9 1.2 3.4.8"
-        fill="none"
-        stroke="#b07f76"
-        strokeWidth="0.95"
-        strokeLinecap="round"
-      />
-      <path
-        d="M42.8 47.9c.5.3 1 .5 1.5.4"
-        fill="none"
-        stroke={TILE_MASCOT_LINE_SOFT}
-        strokeWidth="0.85"
-        strokeLinecap="round"
-      />
-    </>
-  )
-}
-
-function renderActivePortraitMouth(style: TileMascotSpec['mouth']) {
-  switch (style) {
-    case 'open':
-      return (
-        <>
-          <path
-            d="M37.8 53c1.4-1.2 2.8-1.8 4.4-1.8 1.6 0 3.1.6 4.6 1.8"
-            fill="rgba(166,88,92,0.22)"
-            stroke="#8b6064"
-            strokeWidth="1.05"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M38.7 53.7c1.1 1 2.2 1.5 3.5 1.5 1.4 0 2.8-.5 4.1-1.5"
-            fill="none"
-            stroke="#c98b88"
-            strokeWidth="0.9"
-            strokeLinecap="round"
-          />
-        </>
-      )
-    case 'cat':
-      return (
-        <>
-          <path
-            d="M37.9 52.9c1.3-.9 2.6-1.4 3.8-1.4 1.3 0 2.6.5 4 1.4"
-            fill="none"
-            stroke="#8d6266"
-            strokeWidth="1.15"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M40.4 53.5c.7.8 1.5 1.2 2.2 1.2.9 0 1.7-.4 2.4-1.2"
-            fill="none"
-            stroke="#bc827e"
-            strokeWidth="0.95"
-            strokeLinecap="round"
-          />
-        </>
-      )
-    case 'tiny':
-      return (
-        <path
-          d="M39 53.3c1.8-.5 3.7-.6 5.6-.1"
-          fill="none"
-          stroke="#8d6266"
-          strokeWidth="1.05"
-          strokeLinecap="round"
-        />
-      )
-    case 'smile':
-    default:
-      return (
-        <>
-          <path
-            d="M36.8 52.3c1.8 1.5 3.6 2.2 5.5 2.2 2.1 0 4.1-.8 6-2.3"
-            fill="none"
-            stroke="#8d6266"
-            strokeWidth="1.15"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M37.9 53.1c1.5.9 3 1.3 4.4 1.3 1.6 0 3.2-.5 4.8-1.4"
-            fill="none"
-            stroke="#c48987"
-            strokeWidth="0.92"
-            strokeLinecap="round"
-          />
-        </>
-      )
-  }
-}
-
-function renderTileMascotActiveFace(spec: TileMascotSpec) {
-  return (
-    <>
-      {renderActivePortraitBrows(spec.brows)}
-      {renderActivePortraitEyes(spec.eyes)}
-      {renderPortraitNose()}
-      {renderActivePortraitMouth(spec.mouth)}
-    </>
-  )
-}
-
-function renderTileMascotFace(spec: TileMascotSpec, mood: TileMascotMood) {
+function renderTileMascotFace(tileType: TileType, mood: TileMascotMood) {
   switch (mood) {
     case 'board-blocked':
       return (
         <>
-          <path
-            d="M29.9 33.8c2.2-1.2 4.9-1.3 7.5-.4"
-            fill="none"
-            stroke={TILE_MASCOT_INK}
-            strokeWidth="1.35"
-            strokeLinecap="round"
-          />
-          <path
-            d="M46.8 33.3c2.1-.9 4.8-.8 7.2.4"
-            fill="none"
-            stroke={TILE_MASCOT_INK}
-            strokeWidth="1.35"
-            strokeLinecap="round"
-          />
-          {renderPortraitEye(33.6, 40.4, 'sleepy', -0.8)}
-          {renderPortraitEye(50.6, 40.4, 'sleepy', 0.8)}
-          {renderPortraitNose()}
-          <path
-            d="M37 54.2c1.7-1 3.4-1.5 5-1.5 1.7 0 3.4.5 5.1 1.5"
-            fill="none"
-            stroke="#8d6266"
-            strokeWidth="1.1"
-            strokeLinecap="round"
-          />
+          <path d="M28 32.4c2.7-2 5.8-2.4 9.2-1.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.1" strokeLinecap="round" />
+          <path d="M46.8 31.6c3.2-1.7 6.4-1.6 9.4.5" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.1" strokeLinecap="round" />
+          <ellipse cx="33.4" cy="40.1" rx="4.8" ry="5.2" fill="#fffdf7" stroke={TILE_MASCOT_INK} strokeWidth="1.8" />
+          <ellipse cx="50.6" cy="40.1" rx="4.8" ry="5.2" fill="#fffdf7" stroke={TILE_MASCOT_INK} strokeWidth="1.8" />
+          <circle cx="36.8" cy="40.4" r="2.2" fill="#4f2f4d" />
+          <circle cx="47.2" cy="40.4" r="2.2" fill="#4f2f4d" />
+          <path d="M35 52c2.5-1.3 4.8-1.8 7-1.8 2.2 0 4.5.5 7 1.8" fill="none" stroke="#8f4c61" strokeWidth="2.6" strokeLinecap="round" />
         </>
       )
     case 'board-hinted':
       return (
         <>
-          <path
-            d="M29 31.4c2.4-2.2 5.7-2.8 8.9-1.5"
-            fill="none"
-            stroke={TILE_MASCOT_INK}
-            strokeWidth="1.45"
-            strokeLinecap="round"
-          />
-          <path
-            d="M46.3 30.9c2.6-1.9 5.8-2.1 8.7-.4"
-            fill="none"
-            stroke={TILE_MASCOT_INK}
-            strokeWidth="1.45"
-            strokeLinecap="round"
-          />
-          {renderPortraitEye(33.6, 40.1, 'wide')}
-          {renderPortraitEye(50.6, 40.1, 'wide')}
-          {renderPortraitNose()}
-          <path
-            d="M37.9 52.9c1.3-1.3 2.7-1.9 4.2-1.9 1.6 0 3 .6 4.4 1.9"
-            fill="rgba(172,94,96,0.2)"
-            stroke="#8d6266"
-            strokeWidth="1.05"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <path d="M28 28.8c3.7-4.1 7.8-4.5 11.8-1.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.5" strokeLinecap="round" />
+          <path d="M45 28.8c3.7-4.1 7.8-4.5 11.8-1.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.5" strokeLinecap="round" />
+          <ellipse cx="33.2" cy="40.2" rx="4.8" ry="6.2" fill="#fffdf7" stroke={TILE_MASCOT_INK} strokeWidth="1.8" />
+          <ellipse cx="50.8" cy="40.2" rx="4.8" ry="6.2" fill="#fffdf7" stroke={TILE_MASCOT_INK} strokeWidth="1.8" />
+          <circle cx="33.2" cy="41.2" r="2.1" fill="#4f2f4d" />
+          <circle cx="50.8" cy="41.2" r="2.1" fill="#4f2f4d" />
+          <ellipse cx="42" cy="52.3" rx="5.1" ry="6" fill="#fff6ee" stroke="#8f4c61" strokeWidth="2.4" />
         </>
       )
     case 'tray':
       return (
         <>
-          <path
-            d="M29.9 34.2c2.1.8 4.6.7 6.8-.3"
-            fill="none"
-            stroke={TILE_MASCOT_INK}
-            strokeWidth="1.3"
-            strokeLinecap="round"
-          />
-          <path
-            d="M47 34c1.9.9 4.3.8 6.7 0"
-            fill="none"
-            stroke={TILE_MASCOT_INK}
-            strokeWidth="1.3"
-            strokeLinecap="round"
-          />
-          {renderPortraitEye(33.6, 40.3, 'sleepy', 0.2)}
-          {renderPortraitEye(50.6, 40.3, 'sleepy', -0.2)}
-          {renderPortraitNose()}
-          <path
-            d="M38 53.8c1.4-.7 2.7-1 4-1 1.4 0 2.8.3 4.1 1"
-            fill="none"
-            stroke="#8d6266"
-            strokeWidth="1.05"
-            strokeLinecap="round"
-          />
+          <path d="M28.6 33c2.8 1.5 5.8 1.4 8.6-.4" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.1" strokeLinecap="round" />
+          <path d="M46.8 32.8c2.7 1.7 5.7 1.8 8.6.4" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.1" strokeLinecap="round" />
+          <ellipse cx="33.4" cy="40.6" rx="3.3" ry="3.9" fill="#fffdf7" stroke={TILE_MASCOT_INK} strokeWidth="1.4" />
+          <ellipse cx="50.6" cy="40.6" rx="3.3" ry="3.9" fill="#fffdf7" stroke={TILE_MASCOT_INK} strokeWidth="1.4" />
+          <circle cx="33.4" cy="41.7" r="1.6" fill="#4f2f4d" />
+          <circle cx="50.6" cy="41.7" r="1.6" fill="#4f2f4d" />
+          <path d="M35 52.2c2.3-1.7 4.6-2.4 7-2.4 2.4 0 4.7.7 7 2.4" fill="none" stroke="#8f4c61" strokeWidth="2.5" strokeLinecap="round" />
         </>
       )
     case 'burst':
       return (
         <>
-          <path
-            d="M29.6 32.7c2.1-1.3 4.9-1.5 7.4-.5"
-            fill="none"
-            stroke={TILE_MASCOT_INK}
-            strokeWidth="1.4"
-            strokeLinecap="round"
-          />
-          <path
-            d="M46.8 32.4c2.2-1.2 4.9-1.1 7.3.4"
-            fill="none"
-            stroke={TILE_MASCOT_INK}
-            strokeWidth="1.4"
-            strokeLinecap="round"
-          />
-          {renderPortraitEye(33.6, 39.8, 'smile')}
-          {renderPortraitEye(50.6, 39.8, 'smile')}
-          {renderPortraitNose()}
-          <path
-            d="M36 52c1.9 2 3.9 3 6 3 2.2 0 4.4-1 6.5-3.1"
-            fill="none"
-            stroke="#8d6266"
-            strokeWidth="1.25"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M37.8 53.5c1.5.9 2.9 1.3 4.2 1.3 1.4 0 2.9-.4 4.6-1.4"
-            fill="none"
-            stroke="#cf8d8a"
-            strokeWidth="0.92"
-            strokeLinecap="round"
-          />
+          <path d="M28 31.4c3.1-2.2 6.7-2.4 10-.6" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
+          <path d="M46 31.4c3.1-2.2 6.7-2.4 10-.6" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
+          {renderStarEye(33, 39.5)}
+          {renderStarEye(51, 39.5)}
+          <path d="M33 49.5c2.5 6 15.5 6 18 0v3c0 3.1-4.2 7-9 7-4.8 0-9-3.9-9-7v-3Z" fill="#7f2233" stroke="#8f4c61" strokeWidth="2.6" strokeLinejoin="round" />
+          <path d="M38 56.3c2.5 2.2 5.5 2.2 8 0" fill="none" stroke="#ff9ba5" strokeWidth="2.8" strokeLinecap="round" />
         </>
       )
     case 'board-active':
     default:
-      return renderTileMascotActiveFace(spec)
+      return renderTileMascotActiveFace(tileType)
   }
 }
 
@@ -1260,85 +649,63 @@ function TileMascot({
   const spec = TILE_MASCOT_SPECS[tileType]
   const faceTransform =
     mood === 'board-blocked'
-      ? 'translate(0 2.6) scale(1 0.97)'
+      ? 'translate(0 4) scale(1 0.94)'
       : mood === 'burst'
-        ? 'translate(0 -0.6)'
+        ? 'translate(0 -1)'
         : undefined
-  const portraitFrameTransform = 'translate(1.7 0.9) scale(0.96)'
 
   return (
     <span
-      className={`tile-mascot tile-mascot--${tileType} tile-mascot--${mood}${
-        compact ? ' tile-mascot--compact' : ''
-      }`}
+      className={`tile-mascot tile-mascot--${mood}${compact ? ' tile-mascot--compact' : ''}`}
       aria-hidden="true"
     >
       <svg viewBox="0 0 84 84" className="tile-mascot__svg" focusable="false">
-        <ellipse cx="42" cy="76" rx="16" ry="4.6" fill="rgba(80, 48, 75, 0.1)" />
-        <g transform="translate(5 4.8) scale(0.88)" opacity="0.92">
-          {renderTileMascotAccessory(tileType, spec)}
-        </g>
+        <ellipse cx="42" cy="75" rx="17" ry="5" fill="rgba(80, 48, 75, 0.12)" />
+        {renderTileMascotAccessory(tileType, spec)}
         <path
-          d="M23 79c2.8-11 9.9-17.5 19-17.5s16.3 6.5 19 17.5v2H23v-2Z"
-          fill={spec.outfit}
+          d="M26 70c3.5-8.6 10.5-13.5 16-13.5s12.5 4.9 16 13.5V78H26Z"
+          fill={theme.main}
           stroke={TILE_MASCOT_INK}
-          strokeWidth="1.85"
+          strokeWidth="2.2"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
         <path
-          d="M29.2 72.6c3.4-4.5 7.7-6.8 12.8-6.8 5.2 0 9.4 2.3 12.8 6.8"
+          d="M32 68c2.6-4.6 6-7.2 10-7.2s7.4 2.6 10 7.2"
           fill="none"
-          stroke={spec.accentSoft}
-          strokeWidth="3"
+          stroke={theme.accent}
+          strokeWidth="4"
           strokeLinecap="round"
         />
-        <path
-          d="M37.4 63.1c.3 2.7 2 4.8 4.6 6.1 2.7-1.3 4.3-3.4 4.6-6.1"
-          fill={spec.skin}
-          stroke="rgba(106,75,75,0.26)"
-          strokeWidth="1.05"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M36.8 63.7c1.5 3.1 3.2 4.7 5.1 4.7s3.6-1.6 5.3-4.7"
-          fill="none"
-          stroke="#fff6ef"
-          strokeWidth="2.6"
-          strokeLinecap="round"
-        />
-        {renderTileMascotBodyTrim(tileType, spec)}
-        <g transform={portraitFrameTransform}>
-          <g transform={faceTransform}>
-            {renderTileMascotHeadBase(tileType, spec)}
-            {renderPortraitComplexion(mood)}
-            {renderTileMascotFringe(tileType, spec)}
-            {renderTileMascotFace(spec, mood)}
-            <path
-              d="M49.8 31.4c2.2.8 4.3 2.2 6.3 4.4"
-              fill="none"
-              stroke="rgba(255,255,255,0.18)"
-              strokeWidth="1.1"
-              strokeLinecap="round"
-            />
-          </g>
+        <g transform={faceTransform}>
+          <path
+            d="M21 42c0-13.6 9.5-24.2 21-24.2s21 10.6 21 24.2S53.5 62.4 42 62.4 21 55.6 21 42Z"
+            fill={spec.skin}
+            stroke={TILE_MASCOT_INK}
+            strokeWidth="2.4"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M20 37c2.8-14.5 11.9-22.5 22-22.5 9.7 0 18.6 5.9 22 18.5-7.2-4.6-14-6.2-22-6.2-8.7 0-15.6 2.7-22 10.2Z"
+            fill={spec.fringe}
+            stroke={TILE_MASCOT_INK}
+            strokeWidth="2.3"
+            strokeLinejoin="round"
+          />
+          <circle cx="31" cy="47" r="4.1" fill={spec.blush} fillOpacity={mood === 'burst' ? 0.84 : 0.66} />
+          <circle cx="53" cy="47" r="4.1" fill={spec.blush} fillOpacity={mood === 'burst' ? 0.84 : 0.66} />
+          <path
+            d="M39 46.8c1.2 1.1 2.4 1.3 3.5 0"
+            fill="none"
+            stroke="#b98074"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+          />
+          {renderTileMascotFace(tileType, mood)}
+          <circle cx="35" cy="33" r="2.7" fill="rgba(255,255,255,0.28)" />
         </g>
         {renderTileMascotMoodDecor(mood, theme)}
       </svg>
-    </span>
-  )
-}
-
-function TileThemeBadge({
-  badge,
-  className,
-}: {
-  badge: string
-  className: string
-}) {
-  return (
-    <span className={className} aria-hidden="true">
-      {badge}
     </span>
   )
 }
@@ -1522,7 +889,7 @@ function getRecommendedGoal(level: LevelDefinition) {
     return '稳扎稳打'
   }
 
-  return `推荐 ${level.campaign.recommendedSelectionCount} 步内`
+  return `推荐 ${level.campaign.recommendedSelectionCount} 次内`
 }
 
 function getChapterSummaries(
@@ -1706,6 +1073,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
           difficulty: currentLevel.difficulty ?? null,
         },
         status: state.status,
+        matchCount: config.matchCount,
         selectedCount: state.selectedCount,
         removedCount: state.removedCount,
         trayCapacity: config.trayCapacity,
@@ -1953,8 +1321,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 <p className="intro-title">{GAME_TITLE}</p>
                 <p className="intro-subtitle">{WORLD_SUBTITLE}</p>
                 <p className="intro-copy">
-                  这是一份为朱天宇打造的专属闯关版本，已经扩展到 {campaignLevels.length} 关与{' '}
-                  {chapterCount} 个章节。沿着角色章节推进、收集星级，并利用提示和撤销稳住节奏。
+                  这是一份为朱天宇打造的专属闯关版本，已经切成 Vita Mahjong 风格的二消玩法，当前包含{' '}
+                  {campaignLevels.length} 关与 {chapterCount} 个章节。沿着角色章节推进、收集星级，并在顶部四格配对槽里稳住节奏。
                 </p>
 
                 <div className="intro-card__meta">
@@ -2112,8 +1480,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
             ) : null}
 
             <div className="intro-rules">
-              <div className="rule-chip">专属角色领路</div>
-              <div className="rule-chip">{campaignLevels.length}关 {chapterCount}章节</div>
+              <div className="rule-chip">Vita 风格二消</div>
+              <div className="rule-chip">顶部四格配对槽</div>
               <div className="rule-chip">提示 / 撤销道具</div>
             </div>
 
@@ -2131,7 +1499,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 onClick={() => startLevel(selectedLevelId)}
                 disabled={!(campaignProgress.levelRecords[selectedLevelId]?.unlocked ?? false)}
               >
-                整理这一片花圃
+                进入当前关卡
               </button>
             </div>
 
@@ -2211,13 +1579,13 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                                 }}
                                 disabled={!isUnlocked}
                               >
-                                {isUnlocked ? '整理这一片花圃' : '等待解锁'}
+                                {isUnlocked ? '进入这一局' : '等待解锁'}
                               </button>
                               <span className="level-card__status">
                                 {isCurrent
                                   ? '当前推进中'
                                   : levelRecord?.bestSelectedCount !== null
-                                    ? `最佳 ${levelRecord.bestSelectedCount} 步`
+                                    ? `最佳 ${levelRecord.bestSelectedCount} 次`
                                     : '尚未通关'}
                               </span>
                             </div>
@@ -2268,7 +1636,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 </div>
               ) : null}
               <div className="status-chip">
-                <span className="status-label">已选</span>
+                <span className="status-label">已点</span>
                 <strong data-testid="selected-count">{state.selectedCount} 次</strong>
               </div>
               <div className="status-chip status-chip--warning">
@@ -2277,48 +1645,89 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
               </div>
             </div>
 
-            <section className="toolbelt">
-              <div className="toolbelt__header">
+            <section className="tray-panel tray-panel--top">
+              <div className="tray-panel__heading">
                 <div>
-                  <p className="eyebrow">局内辅助</p>
-                  <h2>稳住节奏</h2>
+                  <p className="eyebrow">顶部配对槽</p>
+                  <h2>
+                    {state.trayTiles.length}/{config.trayCapacity}
+                  </h2>
                 </div>
-                <p className="toolbelt__tip">
-                  {state.lastHintTileId ? '提示已标记一张推荐砖块。' : '提示只高亮，不会自动帮你点。'}
+                <p className="tray-tip">
+                  {isResolvingMatch
+                    ? '正在结算二消...'
+                    : `同类头像两张即消，最多只留 ${config.trayCapacity} 张`}
                 </p>
               </div>
 
-              <div className="toolbelt__actions">
-                <button
-                  type="button"
-                  className="tool-button tool-button--hint"
-                  data-testid="hint-button"
-                  disabled={!canUseHintButton}
-                  onClick={handleUseHint}
-                >
-                  <span className="tool-button__icon">灯</span>
-                  <span className="tool-button__label">提示</span>
-                  <span className="tool-button__count">{state.assistCharges.hint}</span>
-                </button>
-                <button
-                  type="button"
-                  className="tool-button tool-button--undo"
-                  data-testid="undo-button"
-                  disabled={!canUseUndo(state)}
-                  onClick={handleUseUndo}
-                >
-                  <span className="tool-button__icon">回</span>
-                  <span className="tool-button__label">撤销</span>
-                  <span className="tool-button__count">{state.assistCharges.undo}</span>
-                </button>
-                <button
-                  type="button"
-                  className="tool-button tool-button--map"
-                  onClick={returnToCampaign}
-                >
-                  <span className="tool-button__icon">图</span>
-                  <span className="tool-button__label">回到花园地图</span>
-                </button>
+              <div
+                className="tray-grid"
+                data-testid="tray-grid"
+                style={{
+                  gridTemplateColumns: `repeat(${config.trayCapacity}, minmax(0, 1fr))`,
+                }}
+              >
+                {Array.from({ length: config.trayCapacity }, (_, slotIndex) => {
+                  const trayTile = state.trayTiles[slotIndex]
+
+                  return (
+                    <div key={`slot-${slotIndex}`} className="tray-slot">
+                      {trayTile ? (
+                        <div
+                          className="tray-tile"
+                          data-testid={`tray-slot-${slotIndex}`}
+                          style={
+                            {
+                              '--tile-main': TILE_THEMES[trayTile.type].main,
+                              '--tile-accent': TILE_THEMES[trayTile.type].accent,
+                              '--tile-shadow': TILE_THEMES[trayTile.type].shadow,
+                              '--tile-outline': TILE_THEMES[trayTile.type].outline,
+                              '--tile-pattern': TILE_THEMES[trayTile.type].pattern,
+                              '--entry-duration': `${config.animationMs.trayEntry}ms`,
+                            } as CSSProperties
+                          }
+                        >
+                          <TileMascot
+                            tileType={trayTile.type}
+                            theme={TILE_THEMES[trayTile.type]}
+                            mood="tray"
+                            compact
+                          />
+                        </div>
+                      ) : (
+                        <div className="tray-slot__placeholder" />
+                      )}
+                    </div>
+                  )
+                })}
+
+                {state.matchBursts.map((burst) => (
+                  <div
+                    key={burst.id}
+                    className="match-burst"
+                    style={getBurstStyle(burst.slotIndex)}
+                    aria-hidden="true"
+                  >
+                    <span
+                      style={
+                        {
+                          '--tile-main': TILE_THEMES[burst.type].main,
+                          '--tile-accent': TILE_THEMES[burst.type].accent,
+                          '--tile-shadow': TILE_THEMES[burst.type].shadow,
+                          '--tile-outline': TILE_THEMES[burst.type].outline,
+                          '--tile-pattern': TILE_THEMES[burst.type].pattern,
+                        } as CSSProperties
+                      }
+                    >
+                      <TileMascot
+                        tileType={burst.type}
+                        theme={TILE_THEMES[burst.type]}
+                        mood="burst"
+                        compact
+                      />
+                    </span>
+                  </div>
+                ))}
               </div>
             </section>
 
@@ -2361,7 +1770,6 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                       <span className="tile-card__shadow" aria-hidden="true" />
                       <span className="tile-card__face">
                         <span className="tile-card__shine" aria-hidden="true" />
-                        <TileThemeBadge badge={theme.badge} className="tile-card__badge" />
                         <TileMascot
                           tileType={tile.type}
                           theme={theme}
@@ -2374,95 +1782,50 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
               </div>
             </div>
 
-            <section className="tray-panel">
-              <div className="tray-panel__heading">
+            <section className="toolbelt">
+              <div className="toolbelt__header">
                 <div>
-                  <p className="eyebrow">收集槽</p>
-                  <h2>
-                    {state.trayTiles.length}/{config.trayCapacity}
-                  </h2>
+                  <p className="eyebrow">局内辅助</p>
+                  <h2>四槽节奏</h2>
                 </div>
-                <p className="tray-tip">
-                  {isResolvingMatch ? '正在结算三消...' : '同类砖块会自动相邻整理'}
+                <p className="toolbelt__tip">
+                  {state.lastHintTileId
+                    ? '提示已圈出一张更适合现在凑对的头像。'
+                    : '提示只会高亮推荐头像，不会替你自动点击。'}
                 </p>
               </div>
 
-              <div
-                className="tray-grid"
-                data-testid="tray-grid"
-                style={{
-                  gridTemplateColumns: `repeat(${config.trayCapacity}, minmax(0, 1fr))`,
-                }}
-              >
-                {Array.from({ length: config.trayCapacity }, (_, slotIndex) => {
-                  const trayTile = state.trayTiles[slotIndex]
-
-                  return (
-                    <div key={`slot-${slotIndex}`} className="tray-slot">
-                      {trayTile ? (
-                        <div
-                          className="tray-tile"
-                          data-testid={`tray-slot-${slotIndex}`}
-                          style={
-                            {
-                              '--tile-main': TILE_THEMES[trayTile.type].main,
-                              '--tile-accent': TILE_THEMES[trayTile.type].accent,
-                              '--tile-shadow': TILE_THEMES[trayTile.type].shadow,
-                              '--tile-outline': TILE_THEMES[trayTile.type].outline,
-                              '--tile-pattern': TILE_THEMES[trayTile.type].pattern,
-                              '--entry-duration': `${config.animationMs.trayEntry}ms`,
-                            } as CSSProperties
-                          }
-                        >
-                          <TileThemeBadge
-                            badge={TILE_THEMES[trayTile.type].badge}
-                            className="tray-tile__badge"
-                          />
-                          <TileMascot
-                            tileType={trayTile.type}
-                            theme={TILE_THEMES[trayTile.type]}
-                            mood="tray"
-                            compact
-                          />
-                        </div>
-                      ) : (
-                        <div className="tray-slot__placeholder" />
-                      )}
-                    </div>
-                  )
-                })}
-
-                {state.matchBursts.map((burst) => (
-                  <div
-                    key={burst.id}
-                    className="match-burst"
-                    style={getBurstStyle(burst.slotIndex)}
-                    aria-hidden="true"
-                  >
-                    <span
-                      style={
-                        {
-                          '--tile-main': TILE_THEMES[burst.type].main,
-                          '--tile-accent': TILE_THEMES[burst.type].accent,
-                          '--tile-shadow': TILE_THEMES[burst.type].shadow,
-                          '--tile-outline': TILE_THEMES[burst.type].outline,
-                          '--tile-pattern': TILE_THEMES[burst.type].pattern,
-                        } as CSSProperties
-                      }
-                    >
-                      <TileThemeBadge
-                        badge={TILE_THEMES[burst.type].badge}
-                        className="match-burst__badge"
-                      />
-                      <TileMascot
-                        tileType={burst.type}
-                        theme={TILE_THEMES[burst.type]}
-                        mood="burst"
-                        compact
-                      />
-                    </span>
-                  </div>
-                ))}
+              <div className="toolbelt__actions">
+                <button
+                  type="button"
+                  className="tool-button tool-button--hint"
+                  data-testid="hint-button"
+                  disabled={!canUseHintButton}
+                  onClick={handleUseHint}
+                >
+                  <span className="tool-button__icon">灯</span>
+                  <span className="tool-button__label">提示</span>
+                  <span className="tool-button__count">{state.assistCharges.hint}</span>
+                </button>
+                <button
+                  type="button"
+                  className="tool-button tool-button--undo"
+                  data-testid="undo-button"
+                  disabled={!canUseUndo(state)}
+                  onClick={handleUseUndo}
+                >
+                  <span className="tool-button__icon">回</span>
+                  <span className="tool-button__label">撤销</span>
+                  <span className="tool-button__count">{state.assistCharges.undo}</span>
+                </button>
+                <button
+                  type="button"
+                  className="tool-button tool-button--map"
+                  onClick={returnToCampaign}
+                >
+                  <span className="tool-button__icon">图</span>
+                  <span className="tool-button__label">回到花园地图</span>
+                </button>
               </div>
             </section>
           </section>
@@ -2497,7 +1860,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 </div>
                 <div className="result-modal__heading">
                   <p className="eyebrow">{state.status === 'won' ? '通关结算' : '本关失败'}</p>
-                  <h2>{state.status === 'won' ? '花园整理完成' : '收集槽卡住了'}</h2>
+                  <h2>{state.status === 'won' ? '本局二消完成' : '顶部配对槽卡住了'}</h2>
                   <p className="result-modal__role">{selectedChapterTheme.roleName} 正在陪你冲刺下一站</p>
                 </div>
               </div>
@@ -2510,7 +1873,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                   <div className="result-modal__reward">
                     <span>本章累计 {selectedChapterSummary?.earnedStars ?? 0} 星</span>
                     <span>
-                      最佳步数 {currentLevelRecord?.bestSelectedCount ?? state.selectedCount}
+                      最佳次数 {currentLevelRecord?.bestSelectedCount ?? state.selectedCount}
                     </span>
                   </div>
                   <div className="result-modal__summary">
@@ -2528,7 +1891,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
               ) : (
                 <p>
                   你还剩 {state.assistCharges.undo} 次撤销、{state.assistCharges.hint} 次提示，
-                  可以直接重试，也可以回到地图再选关。
+                  可以继续重试，也可以回到地图换一关。
                 </p>
               )}
 

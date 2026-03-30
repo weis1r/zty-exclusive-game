@@ -35,9 +35,7 @@ function serializeState(level: LevelDefinition, state: ReturnType<typeof createI
   return `${removedTiles}|${state.trayTiles.map((tile) => tile.type).join(',')}|${state.status}`
 }
 
-function getExposedTilesByPriority(
-  state: ReturnType<typeof createInitialGameState>,
-) {
+function getExposedTilesByPriority(state: ReturnType<typeof createInitialGameState>) {
   const trayTypeCounts = state.trayTiles.reduce<Map<string, number>>((counts, tile) => {
     counts.set(tile.type, (counts.get(tile.type) ?? 0) + 1)
     return counts
@@ -116,16 +114,6 @@ function getLevelUniqueTypeCount(level: LevelDefinition) {
   return new Set(level.tiles.map((tile) => tile.type)).size
 }
 
-function getOpeningUniqueTypeCount(level: LevelDefinition) {
-  const state = createInitialGameState(level, 'playing')
-
-  return new Set(
-    level.tiles
-      .filter((tile) => !isTileBlocked(tile.id, state, GAME_CONFIG))
-      .map((tile) => tile.type),
-  ).size
-}
-
 describe('game engine', () => {
   it('marks lower overlapping tiles as blocked', () => {
     const level = createLevel([
@@ -153,22 +141,21 @@ describe('game engine', () => {
     expect(result.map((tile) => tile.type)).toEqual(['ember', 'ember', 'leaf'])
   })
 
-  it('clears a match of three identical tiles and blocks new picks during the clear animation window', () => {
+  it('clears a match of two identical tiles and blocks new picks during the clear animation window', () => {
     const level = createLevel([
       { id: 'ember-1', type: 'ember', x: 40, y: 40, layer: 0 },
       { id: 'ember-2', type: 'ember', x: 130, y: 40, layer: 0 },
-      { id: 'ember-3', type: 'ember', x: 220, y: 40, layer: 0 },
-      { id: 'leaf-1', type: 'leaf', x: 40, y: 150, layer: 0 },
+      { id: 'leaf-1', type: 'leaf', x: 220, y: 40, layer: 0 },
+      { id: 'leaf-2', type: 'leaf', x: 40, y: 150, layer: 0 },
     ])
 
     let state = createInitialGameState(level, 'playing')
     state = pickTile(state, 'ember-1', level, GAME_CONFIG)
     state = pickTile(state, 'ember-2', level, GAME_CONFIG)
-    state = pickTile(state, 'ember-3', level, GAME_CONFIG)
 
     expect(state.trayTiles).toHaveLength(0)
-    expect(state.removedCount).toBe(3)
-    expect(state.matchBursts).toHaveLength(3)
+    expect(state.removedCount).toBe(2)
+    expect(state.matchBursts).toHaveLength(2)
 
     const unchangedState = pickTile(state, 'leaf-1', level, GAME_CONFIG)
 
@@ -242,7 +229,7 @@ describe('game engine', () => {
     expect(suggestion).toEqual({
       tileId: 'ember-2',
       type: 'ember',
-      reason: 'tray-setup',
+      reason: 'ready-match',
     })
     expect(hintedState.lastHintTileId).toBe('ember-2')
     expect(hintedState.assistCharges.hint).toBe(state.assistCharges.hint - 1)
@@ -265,18 +252,18 @@ describe('game engine', () => {
     expect(undoneState.assistCharges.undo).toBe(progressedState.assistCharges.undo - 1)
   })
 
-  it('ships a 20-level campaign and keeps the default level matchable', () => {
+  it('ships a 6-level campaign and keeps the default level pair-matchable', () => {
     const tileCounts = DEFAULT_LEVEL.tiles.reduce<Record<string, number>>((counts, tile) => {
       counts[tile.type] = (counts[tile.type] ?? 0) + 1
       return counts
     }, {})
 
-    expect(CAMPAIGN_LEVELS).toHaveLength(20)
-    expect(getCampaignChapters(CAMPAIGN)).toHaveLength(5)
+    expect(CAMPAIGN_LEVELS).toHaveLength(6)
+    expect(getCampaignChapters(CAMPAIGN)).toHaveLength(2)
     expect(DEFAULT_LEVEL.id).toBe('thorn-garden-01')
     expect(DEFAULT_LEVEL.name).toBe('荆棘迷圃')
     expect(DEFAULT_LEVEL.difficulty).toBe('easy')
-    expect(DEFAULT_LEVEL.tiles).toHaveLength(36)
+    expect(DEFAULT_LEVEL.tiles).toHaveLength(20)
     expect(Object.values(tileCounts).every((count) => count % GAME_CONFIG.matchCount === 0)).toBe(
       true,
     )
@@ -290,12 +277,12 @@ describe('game engine', () => {
       .sort()
 
     expect(exposedTileIds).toEqual(
-      ['bloom-1', 'ember-1', 'ember-2', 'ember-3', 'leaf-1', 'leaf-2'].sort(),
+      ['bloom-1', 'bloom-2', 'ember-1', 'ember-2', 'leaf-1', 'leaf-2'].sort(),
     )
-    expect(DEFAULT_LEVEL.tiles.filter((tile) => isTileBlocked(tile.id, state, GAME_CONFIG))).toHaveLength(30)
+    expect(DEFAULT_LEVEL.tiles.filter((tile) => isTileBlocked(tile.id, state, GAME_CONFIG))).toHaveLength(14)
   })
 
-  it('gives the default level one immediate match and two setup tiles at the start', () => {
+  it('gives the default level three immediate pairs at the start', () => {
     const state = createInitialGameState(DEFAULT_LEVEL, 'playing')
     const exposedTypeCounts = DEFAULT_LEVEL.tiles
       .filter((tile) => !isTileBlocked(tile.id, state, GAME_CONFIG))
@@ -305,59 +292,27 @@ describe('game engine', () => {
       }, {})
 
     expect(exposedTypeCounts).toEqual({
-      ember: 3,
+      bloom: 2,
+      ember: 2,
       leaf: 2,
-      bloom: 1,
     })
   })
 
-  it('ramps tile variety across all 20 levels and gives chapter finais more visible icons', () => {
-    const expectedTypeCurve = [4, 4, 5, 5, 5, 6, 5, 5, 6, 6, 5, 5, 5, 6, 6, 5, 5, 5, 6, 6]
+  it('keeps the 6-level campaign on the intended tile variety curve', () => {
+    const expectedTypeCurve = [5, 6, 7, 6, 6, 6]
     const uniqueTypeCounts = CAMPAIGN_LEVELS.map((level) => getLevelUniqueTypeCount(level))
 
     expect(uniqueTypeCounts).toEqual(expectedTypeCurve)
-    expect(uniqueTypeCounts.every((count) => count <= 6)).toBe(true)
-
-    for (const chapter of getCampaignChapters(CAMPAIGN)) {
-      const chapterLevels = CAMPAIGN_LEVELS.filter((level) => level.campaign?.chapterId === chapter.id)
-      const finaleStartIndex = chapterLevels.length === 3 ? chapterLevels.length - 1 : chapterLevels.length - 2
-      const earlierLevels = chapterLevels.slice(0, finaleStartIndex)
-      const finaleLevels = chapterLevels.slice(finaleStartIndex)
-
-      const earlierTypeMax = Math.max(...earlierLevels.map((level) => getLevelUniqueTypeCount(level)))
-      const finaleTypeMin = Math.min(...finaleLevels.map((level) => getLevelUniqueTypeCount(level)))
-      const earlierOpeningMax = Math.max(
-        ...earlierLevels.map((level) => getOpeningUniqueTypeCount(level)),
-      )
-      const finaleOpeningMin = Math.min(
-        ...finaleLevels.map((level) => getOpeningUniqueTypeCount(level)),
-      )
-
-      expect(finaleTypeMin).toBeGreaterThan(earlierTypeMax)
-      expect(finaleOpeningMin).toBeGreaterThan(earlierOpeningMax)
-    }
+    expect(uniqueTypeCounts[2]).toBeGreaterThan(uniqueTypeCounts[0])
+    expect(uniqueTypeCounts.slice(3).every((count) => count === 6)).toBe(true)
   })
 
   it('keeps assist charges on the intended campaign curve', () => {
     expect(CAMPAIGN_LEVELS.map((level) => level.campaign?.startingAssists)).toEqual([
       { undo: 2, hint: 2 },
       { undo: 2, hint: 2 },
-      { undo: 2, hint: 2 },
-      { undo: 2, hint: 2 },
-      { undo: 2, hint: 2 },
       { undo: 2, hint: 1 },
       { undo: 2, hint: 1 },
-      { undo: 2, hint: 1 },
-      { undo: 2, hint: 1 },
-      { undo: 2, hint: 1 },
-      { undo: 2, hint: 1 },
-      { undo: 2, hint: 1 },
-      { undo: 2, hint: 1 },
-      { undo: 2, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
       { undo: 1, hint: 1 },
       { undo: 1, hint: 1 },
     ])

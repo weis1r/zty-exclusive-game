@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "android:build-web": "DEPLOY_TARGET=android sh -c 'tsc -b && vite build --outDir dist-android'",
+    "android:sync-web": "node ./scripts/sync-android-assets.mjs",
+    "android:prepare": "npm run android:build-web && npm run android:sync-web",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "lint": "eslint .",

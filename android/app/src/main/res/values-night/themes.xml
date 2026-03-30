@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <style name="Theme.ZtyExclusiveGame" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <item name="colorPrimary">@color/shell_accent</item>
+    <item name="colorPrimaryDark">@color/shell_accent</item>
+    <item name="colorAccent">@color/shell_accent</item>
+    <item name="android:statusBarColor">@color/shell_background</item>
+    <item name="android:navigationBarColor">@color/shell_background</item>
+    <item name="android:windowBackground">@color/shell_background</item>
+  </style>
+</resources>
