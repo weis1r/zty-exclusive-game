@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <string name="app_name">朱天宇专属游戏</string>
+  <string name="app_name">zty乐信AI测试岗笔试题</string>
   <string name="android_loading_title">正在装载花园远征...</string>
   <string name="android_loading_subtitle">首次启动会从 App 内置资源载入游戏。</string>
   <string name="android_error_title">游戏暂时没打开</string>

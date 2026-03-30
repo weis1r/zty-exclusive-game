@@ -98,7 +98,7 @@ describe('GameApp classic flow', () => {
     expect(screen.getByTestId('tile-l1-ember-1')).toBeInTheDocument()
     expect(screen.getByTestId('game-rule-chip')).toHaveTextContent('经典四槽')
     expect(screen.getByTestId('game-tile-count')).toHaveTextContent('2')
-    expect(screen.getByTestId('shift-legend')).toHaveTextContent('最后 1 秒才可点')
+    expect(screen.getByTestId('countdown-remaining')).toHaveTextContent('04:00')
   })
 
   it('supports hint and undo inside the game screen', () => {
@@ -113,6 +113,7 @@ describe('GameApp classic flow', () => {
 
     renderGame(campaign)
     startFromHome()
+    vi.useFakeTimers()
 
     expect(screen.getByTestId('undo-button')).toBeDisabled()
 
@@ -124,12 +125,17 @@ describe('GameApp classic flow', () => {
     fireEvent.click(screen.getByTestId('hint-button'))
 
     expect(screen.getByTestId('hint-button')).toHaveTextContent('0')
+    expect(screen.getByTestId('remaining-count')).toHaveTextContent('2 块')
+
+    act(() => {
+      vi.advanceTimersByTime(GAME_CONFIG.animationMs.matchClear + 160)
+    })
 
     fireEvent.click(screen.getByTestId('undo-button'))
 
-    expect(screen.getByTestId('selected-count')).toHaveTextContent('0 次')
-    expect(screen.getByTestId('remaining-count')).toHaveTextContent('4 块')
-    expect(screen.queryByTestId('tray-slot-0')).not.toBeInTheDocument()
+    expect(screen.getByTestId('selected-count')).toHaveTextContent('1 次')
+    expect(screen.getByTestId('remaining-count')).toHaveTextContent('3 块')
+    expect(screen.getByTestId('tray-slot-0')).toBeInTheDocument()
   })
 
   it('shows the result screen after victory and can continue to the next level', async () => {
@@ -146,9 +152,16 @@ describe('GameApp classic flow', () => {
 
     renderGame(campaign)
     startFromHome()
+    vi.useFakeTimers()
 
     fireEvent.click(screen.getByTestId('tile-l1-ember-1'))
     fireEvent.click(screen.getByTestId('tile-l1-ember-2'))
+
+    expect(screen.getByTestId('game-win-celebration')).toBeInTheDocument()
+
+    act(() => {
+      vi.advanceTimersByTime(1400)
+    })
 
     await waitFor(() => {
       expect(screen.getByTestId('result-screen')).toBeInTheDocument()
@@ -181,6 +194,7 @@ describe('GameApp classic flow', () => {
 
     renderGame(campaign)
     startFromHome()
+    vi.useFakeTimers()
 
     expect(screen.getByTestId('tile-dyn-1')).toBeDisabled()
 
@@ -194,6 +208,10 @@ describe('GameApp classic flow', () => {
 
     fireEvent.click(screen.getByTestId('tile-dyn-1'))
     fireEvent.click(screen.getByTestId('tile-dyn-2'))
+
+    act(() => {
+      vi.advanceTimersByTime(1400)
+    })
 
     await waitFor(() => {
       expect(screen.getByTestId('result-screen')).toBeInTheDocument()

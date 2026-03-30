@@ -89,6 +89,15 @@ export interface MatchBurst {
   type: TileType
 }
 
+export interface HintBurst {
+  id: string
+  tileId: string
+  type: TileType
+  x: number
+  y: number
+  layer: number
+}
+
 export type GameStatus = 'idle' | 'playing' | 'won' | 'lost'
 export type LossReason = 'stuck' | 'time-up'
 
@@ -101,6 +110,7 @@ export interface GameStateSnapshot {
   removedCount: number
   resolvedMatchIds: string[]
   matchBursts: MatchBurst[]
+  hintBursts: HintBurst[]
   lastHintTileId: string | null
   elapsedMs: number
   timerRemainingMs: number
@@ -117,6 +127,7 @@ export interface GameState {
   removedCount: number
   resolvedMatchIds: string[]
   matchBursts: MatchBurst[]
+  hintBursts: HintBurst[]
   assistCharges: AssistCharges
   lastHintTileId: string | null
   elapsedMs: number
@@ -128,7 +139,8 @@ export interface GameState {
 export type HintReason = 'ready-match' | 'tray-setup' | 'open-layer'
 
 export interface HintSuggestion {
-  tileId: string
+  tileIds: string[]
+  trayEntryIds: string[]
   type: TileType
   reason: HintReason
 }

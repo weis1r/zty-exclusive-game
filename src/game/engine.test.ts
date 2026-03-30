@@ -145,7 +145,7 @@ describe('game engine', () => {
     expect(restartedState.boardTiles.every((tile) => !tile.removed)).toBe(true)
   })
 
-  it('recommends matching the tray tail and consumes a hint charge', () => {
+  it('directly removes one exposed pair and consumes a hint charge', () => {
     const level = createLevel([
       { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
       { id: 'ember-2', type: 'ember', x: 80, y: 0, layer: 0 },
@@ -160,12 +160,54 @@ describe('game engine', () => {
     const hintedState = useHint(state, level, GAME_CONFIG)
 
     expect(suggestion).toEqual({
-      tileId: 'ember-2',
+      tileIds: ['ember-2'],
+      trayEntryIds: ['ember-1-1'],
       type: 'ember',
       reason: 'ready-match',
     })
-    expect(hintedState.lastHintTileId).toBe('ember-2')
+    expect(hintedState.boardTiles.find((tile) => tile.id === 'ember-2')?.removed).toBe(true)
+    expect(hintedState.hintBursts).toHaveLength(1)
+    expect(hintedState.matchBursts).toHaveLength(1)
+    expect(hintedState.lastHintTileId).toBeNull()
+    expect(hintedState.history).toHaveLength(2)
+    expect(hintedState.removedCount).toBe(state.removedCount + 2)
     expect(hintedState.assistCharges.hint).toBe(state.assistCharges.hint - 1)
+  })
+
+  it('wins when hint clears the last board tile together with the tray tail', () => {
+    const level = createLevel([
+      { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
+      { id: 'ember-2', type: 'ember', x: 80, y: 0, layer: 0 },
+    ])
+
+    let state = createInitialGameState(level, 'playing')
+    state = pickTile(state, 'ember-1', level, GAME_CONFIG)
+    state = useHint(state, level, GAME_CONFIG)
+
+    expect(state.status).toBe('won')
+    expect(state.lossReason).toBeNull()
+    expect(state.trayTiles).toHaveLength(0)
+    expect(getRemainingBoardTiles(state)).toHaveLength(0)
+  })
+
+  it('auto-wins when only four board tiles remain and the tray is empty', () => {
+    const level = createLevel([
+      { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
+      { id: 'ember-2', type: 'ember', x: 80, y: 0, layer: 0 },
+      { id: 'leaf-1', type: 'leaf', x: 160, y: 0, layer: 0 },
+      { id: 'leaf-2', type: 'leaf', x: 240, y: 0, layer: 0 },
+      { id: 'bloom-1', type: 'bloom', x: 0, y: 80, layer: 0 },
+      { id: 'bloom-2', type: 'bloom', x: 80, y: 80, layer: 0 },
+    ])
+
+    let state = createInitialGameState(level, 'playing')
+    state = pickTile(state, 'ember-1', level, GAME_CONFIG)
+    state = pickTile(state, 'ember-2', level, GAME_CONFIG)
+
+    expect(state.status).toBe('won')
+    expect(state.lossReason).toBeNull()
+    expect(getRemainingBoardTiles(state)).toHaveLength(4)
+    expect(state.trayTiles).toHaveLength(0)
   })
 
   it('restores the previous snapshot including elapsed time when undo is used', () => {
@@ -236,17 +278,17 @@ describe('game engine', () => {
     expect(getDisplayedTileType(level.tiles[1], level, shiftedState.elapsedMs)).toBe('ember')
   })
 
-  it('ships a 20-level campaign with the 48/60/72/84/96 tile curve capped after level 5', () => {
+  it('ships a 20-level campaign with the 36/48/60/72/84 tile curve capped after level 5', () => {
     expect(CAMPAIGN_LEVELS).toHaveLength(20)
     expect(getCampaignChapters(CAMPAIGN)).toHaveLength(5)
     expect(DEFAULT_LEVEL.id).toBe('thorn-garden-01')
     expect(DEFAULT_LEVEL.campaign?.shapeId).toBe('ring')
     expect(DEFAULT_LEVEL.campaign?.shapeLabel).toBe('圆环')
     expect(CAMPAIGN_LEVELS.map((level) => level.campaign?.tileCount)).toEqual([
-      48, 60, 72, 84, 96,
-      96, 96, 96, 96, 96,
-      96, 96, 96, 96, 96,
-      96, 96, 96, 96, 96,
+      36, 48, 60, 72, 84,
+      84, 84, 84, 84, 84,
+      84, 84, 84, 84, 84,
+      84, 84, 84, 84, 84,
     ])
     expect(CAMPAIGN_LEVELS.map((level) => level.campaign?.chapterRuleId)).toEqual(
       Array.from({ length: 20 }, () => 'classic'),
@@ -260,10 +302,10 @@ describe('game engine', () => {
       return counts
     }, {})
 
-    expect(DEFAULT_LEVEL.tiles).toHaveLength(48)
-    expect(dynamicCounts['shift-a']).toBe(10)
-    expect(dynamicCounts['shift-b']).toBe(10)
-    expect(dynamicCounts.static).toBe(28)
+    expect(DEFAULT_LEVEL.tiles).toHaveLength(36)
+    expect(dynamicCounts['shift-a']).toBe(7)
+    expect(dynamicCounts['shift-b']).toBe(7)
+    expect(dynamicCounts.static).toBe(22)
   })
 
   it('keeps every shipped campaign level using even counts per tile type', () => {

@@ -7,6 +7,7 @@ import type {
   GameState,
   GameStateSnapshot,
   GameStatus,
+  HintBurst,
   HintSuggestion,
   LevelDefinition,
   LossReason,
@@ -128,6 +129,10 @@ function cloneMatchBursts(matchBursts: MatchBurst[]): MatchBurst[] {
   return matchBursts.map((burst) => ({ ...burst }))
 }
 
+function cloneHintBursts(hintBursts: HintBurst[]): HintBurst[] {
+  return hintBursts.map((burst) => ({ ...burst }))
+}
+
 function overlaps(topTile: TileDefinition, bottomTile: TileDefinition, config: GameConfig) {
   return (
     Math.abs(topTile.x - bottomTile.x) < config.blockerOverlapX &&
@@ -220,6 +225,7 @@ function createSnapshot(state: GameState): GameStateSnapshot {
     removedCount: state.removedCount,
     resolvedMatchIds: [...state.resolvedMatchIds],
     matchBursts: cloneMatchBursts(state.matchBursts),
+    hintBursts: cloneHintBursts(state.hintBursts),
     lastHintTileId: state.lastHintTileId,
     elapsedMs: state.elapsedMs,
     timerRemainingMs: state.timerRemainingMs,
@@ -253,6 +259,16 @@ function getTrayTailRun(trayTiles: TrayTile[]) {
     type: lastTrayTile.type,
     count,
   }
+}
+
+function getTrayTailRunEntries(trayTiles: TrayTile[]): TrayTile[] {
+  const trayTailRun = getTrayTailRun(trayTiles)
+
+  if (!trayTailRun) {
+    return []
+  }
+
+  return trayTiles.slice(-trayTailRun.count)
 }
 
 function getLevelTypePool(level: LevelDefinition): TileType[] {
@@ -362,6 +378,13 @@ function resolveGameStatus(
   trayTiles: TrayTile[],
   trayCapacity: number,
 ): { status: GameStatus; lossReason: LossReason | null } {
+  if (remainingBoardTileCount <= 4 && trayTiles.length === 0) {
+    return {
+      status: 'won',
+      lossReason: null,
+    }
+  }
+
   if (remainingBoardTileCount === 0 && trayTiles.length === 0) {
     return {
       status: 'won',
@@ -405,10 +428,11 @@ export function createInitialGameState(
     removedCount: 0,
     resolvedMatchIds: [],
     matchBursts: [],
+    hintBursts: [],
     assistCharges: getStartingAssistCharges(level, options.assistChargesOverride),
     lastHintTileId: null,
     elapsedMs: 0,
-    timerRemainingMs: options.timerRemainingMs ?? 90_000,
+    timerRemainingMs: options.timerRemainingMs ?? 300_000,
     lossReason: null,
     history: [],
   }
@@ -435,13 +459,14 @@ export function clearResolvedMatches(state: GameState): GameState {
 }
 
 export function clearHint(state: GameState): GameState {
-  if (state.lastHintTileId === null) {
+  if (state.lastHintTileId === null && state.hintBursts.length === 0) {
     return state
   }
 
   return {
     ...state,
     lastHintTileId: null,
+    hintBursts: [],
   }
 }
 
@@ -503,6 +528,7 @@ export function canUseUndo(state: GameState): boolean {
   return (
     state.status !== 'idle' &&
     state.matchBursts.length === 0 &&
+    state.hintBursts.length === 0 &&
     state.assistCharges.undo > 0 &&
     state.history.length > 0
   )
@@ -532,7 +558,11 @@ export function getHintSuggestion(
   level: LevelDefinition,
   config: GameConfig,
 ): HintSuggestion | null {
-  if (state.status !== 'playing' || state.matchBursts.length > 0) {
+  if (
+    state.status !== 'playing' ||
+    state.matchBursts.length > 0 ||
+    state.hintBursts.length > 0
+  ) {
     return null
   }
 
@@ -549,39 +579,46 @@ export function getHintSuggestion(
   })
 
   const trayTailRun = getTrayTailRun(state.trayTiles)
-  const readyMatchTile =
+  const trayTailRunEntries = getTrayTailRunEntries(state.trayTiles)
+  const missingMatchCount =
     trayTailRun && trayTailRun.count < config.matchCount
-      ? exposedTiles.find((tile) => tile.currentType === trayTailRun.type)
-      : null
+      ? config.matchCount - trayTailRun.count
+      : 0
+  const readyMatchTiles =
+    trayTailRun && missingMatchCount > 0
+      ? exposedTiles
+          .filter((tile) => tile.currentType === trayTailRun.type)
+          .slice(0, missingMatchCount)
+      : []
 
-  if (readyMatchTile) {
+  if (readyMatchTiles.length === missingMatchCount && trayTailRun) {
+    const tailEntries = trayTailRunEntries.slice(-trayTailRun.count)
+
     return {
-      tileId: readyMatchTile.id,
-      type: readyMatchTile.currentType,
+      tileIds: readyMatchTiles.map((tile) => tile.id),
+      trayEntryIds: tailEntries.map((tile) => tile.entryId),
+      type: trayTailRun.type,
       reason: 'ready-match',
     }
   }
 
-  const hasRoomForFreshPair =
-    state.trayTiles.length <= config.trayCapacity - config.matchCount
-  const traySetupTile = hasRoomForFreshPair
-    ? exposedTiles.find(
-        (tile) => (exposedTypeCounts.get(tile.currentType) ?? 0) >= config.matchCount,
-      )
-    : null
+  const pairType =
+    exposedTiles.find((tile) => (exposedTypeCounts.get(tile.currentType) ?? 0) >= config.matchCount)
+      ?.currentType ?? null
 
-  if (traySetupTile) {
-    return {
-      tileId: traySetupTile.id,
-      type: traySetupTile.currentType,
-      reason: 'tray-setup',
-    }
+  if (!pairType) {
+    return null
   }
 
+  const pairTiles = exposedTiles
+    .filter((tile) => tile.currentType === pairType)
+    .slice(0, config.matchCount)
+
   return {
-    tileId: exposedTiles[0].id,
-    type: exposedTiles[0].currentType,
-    reason: 'open-layer',
+    tileIds: pairTiles.map((tile) => tile.id),
+    trayEntryIds: [],
+    type: pairType,
+    reason: 'tray-setup',
   }
 }
 
@@ -593,6 +630,7 @@ export function useHint(
   if (
     state.status !== 'playing' ||
     state.matchBursts.length > 0 ||
+    state.hintBursts.length > 0 ||
     state.assistCharges.hint <= 0
   ) {
     return state
@@ -604,13 +642,48 @@ export function useHint(
     return state
   }
 
+  const removedTileIds = new Set(suggestion.tileIds)
+  const removedTrayEntryIds = new Set(suggestion.trayEntryIds)
+  const sourceTiles = state.boardTiles.filter((tile) => removedTileIds.has(tile.id))
+  const removedTrayTiles = state.trayTiles.filter((tile) => removedTrayEntryIds.has(tile.entryId))
+  const nextBoardTiles = state.boardTiles.map((tile) =>
+    removedTileIds.has(tile.id)
+      ? {
+          ...tile,
+          removed: true,
+        }
+      : tile,
+  )
+  const nextTrayTiles = state.trayTiles.filter((tile) => !removedTrayEntryIds.has(tile.entryId))
+  const remainingBoardTileCount = nextBoardTiles.filter((tile) => !tile.removed).length
+
   return {
     ...state,
+    boardTiles: nextBoardTiles,
+    trayTiles: nextTrayTiles,
+    orbitPockets: cloneOrbitPockets(state.orbitPockets),
+    ...resolveGameStatus(remainingBoardTileCount, nextTrayTiles, config.trayCapacity),
+    removedCount: state.removedCount + suggestion.tileIds.length + suggestion.trayEntryIds.length,
+    resolvedMatchIds: removedTrayTiles.map((tile) => tile.entryId),
+    matchBursts: removedTrayTiles.map((tile) => ({
+      id: tile.entryId,
+      slotIndex: state.trayTiles.findIndex((trayTile) => trayTile.entryId === tile.entryId),
+      type: tile.type,
+    })),
+    hintBursts: sourceTiles.map((tile) => ({
+      id: `hint-${tile.id}-${state.selectedCount}-${state.elapsedMs}`,
+      tileId: tile.id,
+      type: suggestion.type,
+      x: tile.x,
+      y: tile.y,
+      layer: tile.layer,
+    })),
     assistCharges: {
       ...state.assistCharges,
       hint: state.assistCharges.hint - 1,
     },
-    lastHintTileId: suggestion.tileId,
+    lastHintTileId: null,
+    history: pushHistory(state),
   }
 }
 
@@ -619,7 +692,7 @@ export function canMoveTrayTileToPocket(
   level: LevelDefinition,
   trayIndex: number,
 ): boolean {
-  if (state.status !== 'playing' || state.matchBursts.length > 0) {
+  if (state.status !== 'playing' || state.matchBursts.length > 0 || state.hintBursts.length > 0) {
     return false
   }
 
@@ -670,7 +743,7 @@ export function canReleasePocketToTray(
   level: LevelDefinition,
   pocketIndex: number,
 ): boolean {
-  if (state.status !== 'playing' || state.matchBursts.length > 0) {
+  if (state.status !== 'playing' || state.matchBursts.length > 0 || state.hintBursts.length > 0) {
     return false
   }
 
@@ -731,7 +804,7 @@ export function pickTile(
   level: LevelDefinition,
   config: GameConfig,
 ): GameState {
-  if (state.status !== 'playing' || state.matchBursts.length > 0) {
+  if (state.status !== 'playing' || state.matchBursts.length > 0 || state.hintBursts.length > 0) {
     return state
   }
 
@@ -783,6 +856,7 @@ export function pickTile(
     removedCount: state.removedCount + matchBursts.length,
     resolvedMatchIds: matchBursts.map((burst) => burst.id),
     matchBursts,
+    hintBursts: [],
     lastHintTileId: null,
     elapsedMs: state.elapsedMs,
     timerRemainingMs: state.timerRemainingMs,

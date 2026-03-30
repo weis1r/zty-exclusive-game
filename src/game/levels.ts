@@ -46,7 +46,7 @@ interface LevelBlueprint {
   fillerPattern: FillerPatternId
 }
 
-const TILE_COUNT_START = 48
+const TILE_COUNT_START = 36
 const TILE_COUNT_STEP = 12
 const TILE_COUNT_CAP_LEVEL = 5
 const DYNAMIC_GROUP_SHARE = 0.2
@@ -265,66 +265,66 @@ const CHAPTER_BLUEPRINTS: ChapterBlueprint[] = [
     id: 'chapter-bloom-path',
     order: 1,
     title: '基础堆叠',
-    subtitle: '48 块 · 无暂存',
-    summary: '先用 48 块小局熟悉四槽顺序入槽与相邻成对，开局会给你 3 组明显安全对。',
+    subtitle: '36-72 块 · 无暂存',
+    summary: '前四关把块数放轻一档，先熟悉四槽顺序入槽与相邻成对，开局会给你 3 组明显安全对。',
     rewardLabel: '稳手起拍',
     accentColor: '#f0b165',
-    tileCount: 48,
+    tileCount: 72,
     chapterRuleId: 'classic',
     chapterRuleLabel: '基础堆叠',
-    startingAssists: { undo: 2, hint: 2 },
+    startingAssists: { undo: 3, hint: 6 },
   },
   {
     id: 'chapter-mirror-court',
     order: 2,
     title: '单轨暂存',
-    subtitle: '60 块 · 尾牌寄存',
-    summary: '解锁 1 个轨道暂存位，只能把托盘尾牌送出去，再从尾部接回，开始学会缓冲错位单牌。',
+    subtitle: '84 块 · 尾牌寄存',
+    summary: '解锁 1 个轨道暂存位，只能把托盘尾牌送出去，再从尾部接回，块数不再继续暴涨，开始学会缓冲错位单牌。',
     rewardLabel: '尾轨许可',
     accentColor: '#8db6f0',
-    tileCount: 60,
+    tileCount: 84,
     chapterRuleId: 'single-pocket-tail',
     chapterRuleLabel: '单轨暂存',
-    startingAssists: { undo: 2, hint: 1 },
+    startingAssists: { undo: 3, hint: 5 },
   },
   {
     id: 'chapter-sunset-orchard',
     order: 3,
     title: '逆向回放',
-    subtitle: '72 块 · 头部回插',
-    summary: '同样只有 1 个暂存位，但放回时会插到托盘头部，让你能主动重排相邻顺序。',
+    subtitle: '84 块 · 头部回插',
+    summary: '同样只有 1 个暂存位，但放回时会插到托盘头部，让你能主动重排相邻顺序，练熟经典控盘。',
     rewardLabel: '逆向回路',
     accentColor: '#ff9c62',
-    tileCount: 72,
+    tileCount: 84,
     chapterRuleId: 'single-pocket-head-return',
     chapterRuleLabel: '逆向回放',
-    startingAssists: { undo: 1, hint: 1 },
+    startingAssists: { undo: 2, hint: 4 },
   },
   {
     id: 'chapter-verdant-lab',
     order: 4,
     title: '自由换序',
-    subtitle: '86 块 · 任意抽牌',
+    subtitle: '84 块 · 任意抽牌',
     summary: '可以把托盘中任意一张送进单轨暂存位，再从尾部回插，真正开始围绕托盘经营做决策。',
     rewardLabel: '换序通行证',
     accentColor: '#58c99b',
-    tileCount: 86,
+    tileCount: 84,
     chapterRuleId: 'single-pocket-any',
     chapterRuleLabel: '自由换序',
-    startingAssists: { undo: 1, hint: 1 },
+    startingAssists: { undo: 2, hint: 3 },
   },
   {
     id: 'chapter-starlit-canopy',
     order: 5,
     title: '双轨过载',
-    subtitle: '98 块 · 双暂存',
-    summary: '最终章开放双轨暂存位，任意托盘牌都能双线拆分，但块数和牌型也一起推到全局最高。',
+    subtitle: '84 块 · 双暂存',
+    summary: '最终章开放双轨暂存位，任意托盘牌都能双线拆分，但块数保持封顶，让难度更多落在托盘经营本身。',
     rewardLabel: '双轨勋章',
     accentColor: '#8f92ff',
-    tileCount: 98,
+    tileCount: 84,
     chapterRuleId: 'double-pocket-any',
     chapterRuleLabel: '双轨过载',
-    startingAssists: { undo: 1, hint: 0 },
+    startingAssists: { undo: 1, hint: 2 },
   },
 ]
 
@@ -610,7 +610,7 @@ const LEVEL_IDS_BY_CHAPTER = LEVELS.reduce<Record<string, string[]>>((chapterLev
 
 export const CAMPAIGN: CampaignDefinition = {
   id: 'brick-match-campaign-v2',
-  name: '朱天宇专属游戏',
+  name: 'zty乐信AI测试岗笔试题',
   chapters: CHAPTER_BLUEPRINTS.map((chapter) => ({
     ...chapter,
     levelIds: LEVEL_IDS_BY_CHAPTER[chapter.id] ?? [],

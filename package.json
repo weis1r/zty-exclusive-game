@@ -9,6 +9,8 @@
     "android:build-web": "DEPLOY_TARGET=android sh -c 'tsc -b && vite build --outDir dist-android'",
     "android:sync-web": "node ./scripts/sync-android-assets.mjs",
     "android:prepare": "npm run android:build-web && npm run android:sync-web",
+    "android:assemble-debug": "cd android && ./gradlew assembleDebug",
+    "android:install-debug": "cd android && ./gradlew installDebug",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "lint": "eslint .",

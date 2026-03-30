@@ -7,6 +7,7 @@ import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.webkit.WebViewAssetLoader;
@@ -29,6 +30,7 @@ public class MainActivity extends AppCompatActivity {
 
     webView = binding.gameWebView;
     configureWebView();
+    configureBackNavigation();
 
     binding.retryButton.setOnClickListener(view -> loadGame());
     loadGame();
@@ -42,6 +44,7 @@ public class MainActivity extends AppCompatActivity {
     settings.setAllowContentAccess(false);
     settings.setMediaPlaybackRequiresUserGesture(false);
     settings.setSupportZoom(false);
+    settings.setUseWideViewPort(true);
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       settings.setSafeBrowsingEnabled(true);
@@ -87,6 +90,25 @@ public class MainActivity extends AppCompatActivity {
     webView.loadUrl(GAME_URL);
   }
 
+  private void configureBackNavigation() {
+    getOnBackPressedDispatcher().addCallback(
+        this,
+        new OnBackPressedCallback(true) {
+          @Override
+          public void handleOnBackPressed() {
+            if (webView != null && webView.canGoBack()) {
+              webView.goBack();
+              return;
+            }
+
+            setEnabled(false);
+            getOnBackPressedDispatcher().onBackPressed();
+            setEnabled(true);
+          }
+        }
+    );
+  }
+
   private void showLoading() {
     binding.loadingOverlay.setVisibility(View.VISIBLE);
     binding.errorOverlay.setVisibility(View.GONE);
@@ -103,16 +125,6 @@ public class MainActivity extends AppCompatActivity {
     binding.loadingOverlay.setVisibility(View.GONE);
     binding.errorOverlay.setVisibility(View.VISIBLE);
     binding.errorDetail.setText(getString(R.string.android_error_detail, description));
-  }
-
-  @Override
-  public void onBackPressed() {
-    if (webView != null && webView.canGoBack()) {
-      webView.goBack();
-      return;
-    }
-
-    super.onBackPressed();
   }
 
   @Override

@@ -69,10 +69,35 @@ interface SessionAssistUsage {
   undoUsed: number
 }
 
-const SESSION_START_TIMER_MS = 90_000
+interface AppHistoryState {
+  appScreen: AppScreen
+  levelId: string | null
+}
+
+const SESSION_START_TIMER_MS = 240_000
 const SESSION_BONUS_TIMER_MS = 45_000
-const SESSION_START_HINTS = 8
-const SESSION_BONUS_HINTS = 4
+const SESSION_START_HINTS = 6
+const SESSION_BONUS_HINTS = 2
+const WIN_CELEBRATION_MS = 1280
+
+function isAppHistoryState(value: unknown): value is AppHistoryState {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  const candidate = value as Partial<AppHistoryState>
+
+  return (
+    (candidate.appScreen === 'home' ||
+      candidate.appScreen === 'game' ||
+      candidate.appScreen === 'result') &&
+    ('levelId' in candidate ? candidate.levelId === null || typeof candidate.levelId === 'string' : true)
+  )
+}
+
+function areHistoryStatesEqual(left: AppHistoryState, right: unknown) {
+  return isAppHistoryState(right) && left.appScreen === right.appScreen && left.levelId === right.levelId
+}
 
 function createGameReducer(level: LevelDefinition, config: GameConfig) {
   return (state: GameState, action: GameAction): GameState => {
@@ -180,6 +205,9 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   })
   const [roundSummary, setRoundSummary] = useState<RoundSummary | null>(null)
   const settledRoundRef = useRef<string | null>(null)
+  const historyInitializedRef = useRef(false)
+  const skipNextHistorySyncRef = useRef(false)
+  const historyModeRef = useRef<'push' | 'replace'>('replace')
 
   const homeLevel = getCampaignLevelById(campaignProgress.currentLevelId, campaign) ?? fallbackLevel
   const currentLevel = getCampaignLevelById(activeLevelId, campaign) ?? fallbackLevel
@@ -206,6 +234,82 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
       delete window.advanceTime
     }
   }, [])
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const nextHistoryState = isAppHistoryState(event.state)
+        ? event.state
+        : {
+            appScreen: 'home',
+            levelId: campaignProgress.currentLevelId,
+          }
+
+      skipNextHistorySyncRef.current = true
+      setSettingsOpen(false)
+
+      if (nextHistoryState.appScreen === 'home') {
+        setScreen('home')
+        dispatch({ type: 'clear-hint' })
+        return
+      }
+
+      if (nextHistoryState.levelId) {
+        setActiveLevelId(nextHistoryState.levelId)
+      }
+
+      if (nextHistoryState.appScreen === 'game') {
+        setScreen('game')
+        return
+      }
+
+      setScreen('result')
+    }
+
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [campaignProgress.currentLevelId])
+
+  useEffect(() => {
+    const nextHistoryState: AppHistoryState = {
+      appScreen: screen,
+      levelId:
+        screen === 'home'
+          ? campaignProgress.currentLevelId
+          : screen === 'result'
+            ? roundSummary?.levelId ?? activeLevelId
+            : activeLevelId,
+    }
+
+    if (!historyInitializedRef.current) {
+      window.history.replaceState(nextHistoryState, '')
+      historyInitializedRef.current = true
+      historyModeRef.current = 'replace'
+      return
+    }
+
+    if (skipNextHistorySyncRef.current) {
+      skipNextHistorySyncRef.current = false
+      window.history.replaceState(nextHistoryState, '')
+      historyModeRef.current = 'replace'
+      return
+    }
+
+    if (areHistoryStatesEqual(nextHistoryState, window.history.state)) {
+      historyModeRef.current = 'replace'
+      return
+    }
+
+    if (historyModeRef.current === 'push') {
+      window.history.pushState(nextHistoryState, '')
+    } else {
+      window.history.replaceState(nextHistoryState, '')
+    }
+
+    historyModeRef.current = 'replace'
+  }, [activeLevelId, campaignProgress.currentLevelId, roundSummary?.levelId, screen])
 
   useEffect(() => {
     if (screen !== 'game' || state.status !== 'playing') {
@@ -266,7 +370,10 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
         trayTiles: state.trayTiles.map((trayTile) => trayTile.type),
         orbitPockets: state.orbitPockets.map((pocketTile) => pocketTile?.type ?? null),
         assistCharges: state.assistCharges,
-        remainingCount: getRemainingBoardTiles(state).length,
+        remainingCount:
+          (currentLevel.campaign?.tileCount ?? currentLevel.tiles.length) - state.removedCount,
+        boardRemainingCount: getRemainingBoardTiles(state).length,
+        hintBursts: state.hintBursts.length,
         exposedTiles: getRemainingBoardTiles(state)
           .filter((tile) => !isTileBlocked(tile.id, state, config))
           .map((tile) => ({
@@ -315,18 +422,18 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   }, [config.animationMs.matchClear, state.matchBursts.length])
 
   useEffect(() => {
-    if (state.lastHintTileId === null) {
+    if (state.hintBursts.length === 0) {
       return
     }
 
     const timer = window.setTimeout(() => {
       dispatch({ type: 'clear-hint' })
-    }, 1500)
+    }, config.animationMs.matchClear + 120)
 
     return () => {
       window.clearTimeout(timer)
     }
-  }, [state.lastHintTileId])
+  }, [config.animationMs.matchClear, state.hintBursts.length])
 
   useEffect(() => {
     if (screen !== 'game' || (state.status !== 'won' && state.status !== 'lost')) {
@@ -373,11 +480,12 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
       }
 
       startTransition(() => {
+        historyModeRef.current = 'replace'
         setSettingsOpen(false)
         setRoundSummary(summary)
         setScreen('result')
       })
-    }, 0)
+    }, state.status === 'won' ? WIN_CELEBRATION_MS : 0)
 
     return () => {
       window.clearTimeout(timer)
@@ -418,6 +526,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
       undoUsed: 0,
     })
     setStartedAt(Date.now())
+    historyModeRef.current = screen === 'home' ? 'push' : 'replace'
     setActiveLevelId(levelId)
     setScreen('game')
     setCampaignProgress((currentProgress) =>
@@ -440,6 +549,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
       undoUsed: 0,
     })
     setStartedAt(Date.now())
+    historyModeRef.current = 'replace'
     setScreen('game')
     dispatch({
       type: 'restart',
@@ -449,6 +559,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   }
 
   function goHome() {
+    historyModeRef.current = 'replace'
     setSettingsOpen(false)
     setRoundSummary(null)
     setScreen('home')
@@ -463,8 +574,14 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
       }
     }
 
-    goHome()
     dispatch({ type: 'clear-hint' })
+
+    if (window.history.length > 1 && isAppHistoryState(window.history.state)) {
+      window.history.back()
+      return
+    }
+
+    goHome()
   }
 
   function handleUseHint() {
@@ -520,6 +637,11 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   }
 
   function handleSecondaryResultAction() {
+    if (window.history.length > 1 && isAppHistoryState(window.history.state)) {
+      window.history.back()
+      return
+    }
+
     goHome()
   }
 
@@ -544,15 +666,10 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
             totalLevels={campaignLevels.length}
             config={config}
             state={state}
-            soundEnabled={soundEnabled}
-            settingsOpen={settingsOpen}
             onBack={handleBackFromGame}
             onPick={(tileId) => dispatch({ type: 'pick', tileId })}
             onMoveTrayToPocket={(trayIndex) => dispatch({ type: 'move-tray-to-pocket', trayIndex })}
             onReleasePocket={(pocketIndex) => dispatch({ type: 'release-pocket', pocketIndex })}
-            onToggleSettings={() => setSettingsOpen((currentValue) => !currentValue)}
-            onToggleSound={() => setSoundEnabled((currentValue) => !currentValue)}
-            onResetProgress={handleResetProgress}
             onUseHint={handleUseHint}
             onUseUndo={handleUseUndo}
           />
