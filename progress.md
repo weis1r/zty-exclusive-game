@@ -615,3 +615,43 @@ Verification
 Open notes
 - 当前 shape 轮廓是“稳定骨架上做轻量变形”，优先保证可解性和露牌范围；如果后续还想把某一关图形再做得更夸张，建议逐关调而不是统一加大 warp。
 - 顶部托盘大牌 bug 的 CSS 约束已经加上，后续如果再改托盘 DOM 结构，需要保住“爆发节点永远是槽位子节点”这条规则。
+
+---
+
+Task
+- 用户新需求: 把每关 144 块改少一些，改为第 1 关 48 块、每过一关 +12、到第 5 关封顶；并加入两组错峰变换块，A/B 各约占 20%，每 3 秒换型，只有最后 1 秒可选，其中 B 组与 A 组反方向且不同步。
+
+What changed
+- 玩法主线回收到经典四槽：
+  - `src/game/engine.ts` 去掉了中途接入的口袋槽规则依赖，状态保持经典托盘流
+  - 仍保留 `elapsedMs` 与 `dynamicGroup`，供变换块逻辑使用
+- 关卡块数曲线改为逐关增长：
+  - `src/game/levels.ts` 现在按关卡序号生成 `48 / 60 / 72 / 84 / 96`，第 5 关后固定 `96`
+  - 每关 `recommendedSelectionCount` 与星级阈值也同步按新块数生成
+- 新增两组变换块：
+  - `shift-a` 与 `shift-b` 各约占总块数 20%
+  - 两组都按 3 秒周期变换类型，最后 1 秒才可点击
+  - `shift-b` 使用 1.5 秒相位偏移，并按相反方向轮换类型
+- 界面与状态输出同步：
+  - `src/App.tsx` 新增游戏内时间推进与 `window.advanceTime(ms)` 分发
+  - `render_game_to_text` 现在会输出 `elapsedMs`、动态块当前类型、分组和周期状态
+  - `src/screens/GameScreen.tsx` 改为显示动态块当前类型，并在锁定窗口禁用点击
+  - `src/App.css` 增加了 A/B 组提示、锁定态和动态块状态标签样式
+- 测试收口到当前目标玩法：
+  - `src/game/engine.test.ts` 改为覆盖经典四槽、块数曲线、A/B 组时间窗和反向轮换
+  - `src/App.test.tsx` 改为覆盖经典三屏流、提示/撤销和动态块在可点击窗口开启后的交互
+
+Verification
+- 已执行并通过：
+  - `npx vitest run src/game/engine.test.ts src/App.test.tsx`
+  - `npm run test -- --run`
+  - `npm run lint`
+  - `npm run build`
+- 额外浏览器脚本巡检：
+  - 首页截图产物：`output/web-game/classic-dynamic-20260331/shot-0.png`
+  - 状态产物：`output/web-game/classic-dynamic-20260331/state-0.json`
+- 用户后续说明将手动跑体验测试，因此不再继续追加自动化试玩。
+
+Open notes
+- `src/game/types.ts` 里仍保留了 `chapterRuleId` / `chapterRuleLabel` / `orbitPockets` 这些兼容字段，但当前玩法已统一按经典四槽运行。
+- 章节文案里还有一部分旧的中途实验描述没有完全重写；不影响当前实际规则和界面交互，如果下一轮继续 polish，可以再把文案统一到“经典四槽 + 错峰变换块”版本。
