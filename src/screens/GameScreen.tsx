@@ -13,7 +13,6 @@ import {
 } from '../game/engine'
 import type { GameConfig, GameState, LevelDefinition, TileDefinition } from '../game/types'
 import { TilePiece } from '../components/TilePiece'
-import { ShapeBadge } from '../components/ShapeBadge'
 
 interface GameScreenProps {
   currentLevel: LevelDefinition
@@ -96,10 +95,6 @@ export function GameScreen({
   const boardScale = Math.min(1, 352 / boardWidth)
   const isResolvingMatch = state.matchBursts.length > 0
   const remainingCount = activeBoardTiles.length
-  const shapeId = currentLevel.campaign?.shapeId
-  const shapeLabel = currentLevel.campaign?.shapeLabel
-  const tileCount = currentLevel.campaign?.tileCount ?? currentLevel.tiles.length
-  const chapterRuleLabel = currentLevel.campaign?.chapterRuleLabel ?? '经典四槽'
   const timerUrgent = state.timerRemainingMs <= 15_000
   const hintSuggestion = getHintSuggestion(state, currentLevel, config)
   const canUseHintButton =
@@ -112,105 +107,86 @@ export function GameScreen({
   return (
     <section className="game-screen" data-testid="game-screen">
       <header className="game-screen__hud">
-        <button
-          type="button"
-          className="icon-button icon-button--wood"
-          data-testid="game-back-button"
-          aria-label="返回首页"
-          onClick={onBack}
-        >
-          <span className="icon-button__glyph">←</span>
-        </button>
+        <div className="game-screen__topbar">
+          <button
+            type="button"
+            className="icon-button icon-button--wood"
+            data-testid="game-back-button"
+            aria-label="返回首页"
+            onClick={onBack}
+          >
+            <span className="icon-button__glyph">←</span>
+          </button>
 
-        <div className="game-screen__stats">
-          <div className="game-stat">
-            <span className="game-stat__label">关卡</span>
-            <strong className="game-stat__value" data-testid="current-level-order">
+          <div className="game-screen__level-pill">
+            <span className="game-screen__level-label">第 {levelOrder} 关</span>
+            <span className="game-screen__level-total">共 {totalLevels} 关</span>
+            <span className="sr-only" data-testid="current-level-order">
               {levelOrder}
-            </strong>
+            </span>
             <span className="sr-only" data-testid="current-level-id">
               {currentLevel.id}
             </span>
           </div>
-          <div className="game-stat">
-            <span className="game-stat__label">已点</span>
-            <strong className="game-stat__value" data-testid="selected-count">
-              {state.selectedCount} 次
-            </strong>
-          </div>
-          <div className={`game-stat game-stat--timer${timerUrgent ? ' game-stat--timer-urgent' : ''}`}>
-            <span className="game-stat__label">剩时</span>
-            <strong className="game-stat__value" data-testid="countdown-remaining">
-              {formatRoundCountdown(state.timerRemainingMs)}
-            </strong>
-          </div>
-          <div className="game-stat">
-            <span className="game-stat__label">块数</span>
-            <strong className="game-stat__value" data-testid="game-tile-count">
-              {tileCount}
-            </strong>
-          </div>
-          <div className="game-stat">
-            <span className="game-stat__label">剩余</span>
-            <strong className="game-stat__value" data-testid="remaining-count">
-              {remainingCount} 块
-            </strong>
+
+          <div className="game-screen__settings">
+            <button
+              type="button"
+              className="icon-button icon-button--wood"
+              data-testid="game-settings-button"
+              aria-label="打开局内设置"
+              aria-expanded={settingsOpen}
+              onClick={onToggleSettings}
+            >
+              <span className="icon-button__glyph">⚙</span>
+            </button>
+            {settingsOpen ? (
+              <div className="settings-popover settings-popover--game">
+                <button
+                  type="button"
+                  className="settings-popover__action"
+                  onClick={onToggleSound}
+                >
+                  音效 {soundEnabled ? '开' : '关'}
+                </button>
+                <button
+                  type="button"
+                  className="settings-popover__action settings-popover__action--danger"
+                  data-testid="game-reset-progress-button"
+                  onClick={onResetProgress}
+                >
+                  清空关卡进度
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
 
-        <div className="game-screen__meta">
-          <div className="game-screen__meta-top">
-            <ShapeBadge
-              shapeId={shapeId}
-              shapeLabel={shapeLabel}
-              className="game-screen__shape-chip"
-            />
-            <div className="game-screen__settings">
-              <button
-                type="button"
-                className="icon-button icon-button--wood"
-                data-testid="game-settings-button"
-                aria-label="打开局内设置"
-                aria-expanded={settingsOpen}
-                onClick={onToggleSettings}
-              >
-                <span className="icon-button__glyph">⚙</span>
-              </button>
-              {settingsOpen ? (
-                <div className="settings-popover settings-popover--game">
-                  <button
-                    type="button"
-                    className="settings-popover__action"
-                    onClick={onToggleSound}
-                  >
-                    音效 {soundEnabled ? '开' : '关'}
-                  </button>
-                  <button
-                    type="button"
-                    className="settings-popover__action settings-popover__action--danger"
-                    data-testid="game-reset-progress-button"
-                    onClick={onResetProgress}
-                  >
-                    清空关卡进度
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          </div>
-          <div className="game-screen__meta-bottom">
-            <span className="hud-chip" data-testid="game-rule-chip">
-              {chapterRuleLabel}
-            </span>
-            <div className="game-screen__progress">/ {totalLevels}</div>
-          </div>
+        <div className={`game-timer${timerUrgent ? ' game-timer--urgent' : ''}`}>
+          <span className="game-timer__label">剩余时间</span>
+          <strong className="game-timer__value" data-testid="countdown-remaining">
+            {formatRoundCountdown(state.timerRemainingMs)}
+          </strong>
         </div>
+
+        <span className="sr-only" data-testid="selected-count">
+          {state.selectedCount} 次
+        </span>
+        <span className="sr-only" data-testid="remaining-count">
+          {remainingCount} 块
+        </span>
+        <span className="sr-only" data-testid="game-tile-count">
+          {currentLevel.campaign?.tileCount ?? currentLevel.tiles.length}
+        </span>
+        <span className="sr-only" data-testid="game-rule-chip">
+          {currentLevel.campaign?.chapterRuleLabel ?? '经典四槽'}
+        </span>
       </header>
 
       <section className="tray-rack">
         <div className="tray-rack__header">
           <div>
-            <p>顶部配对槽</p>
-            <span className="tray-rack__rule">{chapterRuleLabel}</span>
+            <p>配对槽</p>
           </div>
           <strong>
             {state.trayTiles.length}/{config.trayCapacity}
@@ -304,7 +280,7 @@ export function GameScreen({
             <div className="game-screen__shift-legend" data-testid="shift-legend">
               <span className="shift-chip shift-chip--a">A组顺变</span>
               <span className="shift-chip shift-chip--b">B组逆变</span>
-              <span className="shift-note">变换块每 3 秒换型，最后 1 秒才可点</span>
+              <span className="shift-note">末 1 秒可点</span>
             </div>
           )}
         </div>
@@ -323,14 +299,6 @@ export function GameScreen({
         }
       >
         <div className="game-board">
-          <div className="game-board__watermark" aria-hidden="true">
-            <ShapeBadge
-              shapeId={shapeId}
-              shapeLabel={shapeLabel}
-              className="game-board__watermark-badge"
-            />
-          </div>
-
           {activeBoardTiles.map((tile) => {
             const theme = TILE_THEMES[getDisplayedTileType(tile, currentLevel, state.elapsedMs)]
             const blocked = blockedTileIds.has(tile.id)
