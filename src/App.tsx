@@ -1,16 +1,13 @@
 import {
   startTransition,
   useEffect,
+  useEffectEvent,
   useReducer,
   useRef,
   useState,
   type CSSProperties,
 } from 'react'
 import './App.css'
-import avatarBloomScout from './assets/avatar-bloom-scout.svg'
-import avatarMirrorGuide from './assets/avatar-mirror-guide.svg'
-import gardenStickerPack from './assets/garden-sticker-pack.svg'
-import sparkRibbon from './assets/spark-ribbon.svg'
 import { GAME_CONFIG, TILE_THEMES } from './game/config'
 import {
   canUseUndo,
@@ -62,12 +59,13 @@ declare global {
 }
 
 const DIFFICULTY_LABELS: Record<NonNullable<LevelDefinition['difficulty']>, string> = {
-  easy: '简单',
-  normal: '普通',
-  hard: '困难',
+  easy: '热身',
+  normal: '标准',
+  hard: '进阶',
 }
 
 type AppView = 'campaign' | 'game'
+type SessionMode = 'campaign' | 'quick'
 
 type GameAction =
   | { type: 'start-level'; level: LevelDefinition }
@@ -96,714 +94,166 @@ interface CampaignChapterSummary {
   earnedStars: number
 }
 
-interface ChapterAvatarTheme {
-  avatar: string
-  ribbon: string
-  sticker: string
+interface ChapterSurfaceTheme {
   accent: string
   accentSoft: string
-  roleName: string
-  roleTag: string
+  feltGlow: string
+  seal: string
+  sealLabel: string
 }
+
+type TileMood = 'board-active' | 'board-blocked' | 'board-hinted' | 'tray' | 'burst'
 
 const GAME_TITLE = '朱天宇专属游戏'
 const WORLD_SUBTITLE = '花园远征'
+const CHAPTER_TILE_STEPS = [48, 60, 72, 84]
+const AUTO_HINT_IDLE_MS = 7000
+const AUTO_HINT_FLASH_MS = 1700
 
-const CHAPTER_AVATAR_THEMES: Record<string, ChapterAvatarTheme> = {
+type UiSoundKind = 'pick' | 'hint' | 'undo' | 'match' | 'win' | 'lose'
+
+interface ToneStep {
+  frequency: number
+  duration: number
+  gain: number
+}
+
+let sharedAudioContext: AudioContext | null = null
+
+function getAudioContext() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const AudioContextCtor = window.AudioContext
+
+  if (!AudioContextCtor) {
+    return null
+  }
+
+  if (!sharedAudioContext) {
+    sharedAudioContext = new AudioContextCtor()
+  }
+
+  return sharedAudioContext
+}
+
+function getSoundSteps(kind: UiSoundKind): ToneStep[] {
+  switch (kind) {
+    case 'pick':
+      return [{ frequency: 440, duration: 0.06, gain: 0.022 }]
+    case 'hint':
+      return [
+        { frequency: 520, duration: 0.08, gain: 0.016 },
+        { frequency: 660, duration: 0.09, gain: 0.014 },
+      ]
+    case 'undo':
+      return [
+        { frequency: 430, duration: 0.08, gain: 0.016 },
+        { frequency: 350, duration: 0.1, gain: 0.014 },
+      ]
+    case 'match':
+      return [
+        { frequency: 560, duration: 0.08, gain: 0.02 },
+        { frequency: 680, duration: 0.09, gain: 0.018 },
+      ]
+    case 'win':
+      return [
+        { frequency: 520, duration: 0.1, gain: 0.018 },
+        { frequency: 660, duration: 0.12, gain: 0.016 },
+        { frequency: 820, duration: 0.16, gain: 0.014 },
+      ]
+    case 'lose':
+      return [
+        { frequency: 360, duration: 0.12, gain: 0.014 },
+        { frequency: 300, duration: 0.16, gain: 0.012 },
+      ]
+    default:
+      return []
+  }
+}
+
+function playUiSound(kind: UiSoundKind) {
+  const context = getAudioContext()
+
+  if (!context) {
+    return
+  }
+
+  const steps = getSoundSteps(kind)
+
+  if (steps.length === 0) {
+    return
+  }
+
+  const startAt = Math.max(context.currentTime, 0.01)
+
+  if (context.state === 'suspended') {
+    void context.resume()
+  }
+
+  let offset = 0
+
+  steps.forEach((step) => {
+    const oscillator = context.createOscillator()
+    const gainNode = context.createGain()
+    const stepStart = startAt + offset
+    const stepEnd = stepStart + step.duration
+
+    oscillator.type = 'sine'
+    oscillator.frequency.setValueAtTime(step.frequency, stepStart)
+    gainNode.gain.setValueAtTime(0.0001, stepStart)
+    gainNode.gain.exponentialRampToValueAtTime(step.gain, stepStart + 0.01)
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, stepEnd)
+
+    oscillator.connect(gainNode)
+    gainNode.connect(context.destination)
+    oscillator.start(stepStart)
+    oscillator.stop(stepEnd + 0.01)
+
+    offset += step.duration + 0.02
+  })
+}
+
+const CHAPTER_SURFACE_THEMES: Record<string, ChapterSurfaceTheme> = {
   'chapter-bloom-path': {
-    avatar: avatarBloomScout,
-    ribbon: sparkRibbon,
-    sticker: gardenStickerPack,
-    accent: '#ff9952',
-    accentSoft: '#fff3bc',
-    roleName: '晴园小队长',
-    roleTag: '元气花园应援官',
+    accent: '#c9974b',
+    accentSoft: '#efe2bb',
+    feltGlow: 'rgba(226, 195, 141, 0.18)',
+    seal: 'I',
+    sealLabel: '晨露套牌',
   },
   'chapter-mirror-court': {
-    avatar: avatarMirrorGuide,
-    ribbon: sparkRibbon,
-    sticker: gardenStickerPack,
-    accent: '#67b7ff',
-    accentSoft: '#ffd3ef',
-    roleName: '镜庭引路人',
-    roleTag: '幻彩镜庭向导',
+    accent: '#9cb0bf',
+    accentSoft: '#dfe6e8',
+    feltGlow: 'rgba(190, 209, 219, 0.18)',
+    seal: 'II',
+    sealLabel: '镜庭套牌',
+  },
+  'chapter-sunset-orchard': {
+    accent: '#c7866a',
+    accentSoft: '#ead5c4',
+    feltGlow: 'rgba(220, 170, 145, 0.18)',
+    seal: 'III',
+    sealLabel: '晚照套牌',
+  },
+  'chapter-verdant-lab': {
+    accent: '#809777',
+    accentSoft: '#d7dfd3',
+    feltGlow: 'rgba(164, 191, 153, 0.18)',
+    seal: 'IV',
+    sealLabel: '翠影套牌',
+  },
+  'chapter-starlit-canopy': {
+    accent: '#7d8e9b',
+    accentSoft: '#d5dde2',
+    feltGlow: 'rgba(160, 177, 196, 0.18)',
+    seal: 'V',
+    sealLabel: '星幕套牌',
   },
 }
 
-const DEFAULT_CHAPTER_AVATAR_THEME = CHAPTER_AVATAR_THEMES['chapter-bloom-path']
-type TileMascotMood = 'board-active' | 'board-blocked' | 'board-hinted' | 'tray' | 'burst'
-type ChapterGameAvatarMood = 'bar' | 'win' | 'loss'
-
-interface ChapterGameAvatarSpec {
-  skin: string
-  hair: string
-  accent: string
-  outfit: string
-  ring: string
-  blush: string
-}
-
-const CHAPTER_GAME_AVATAR_SPECS: Record<string, ChapterGameAvatarSpec> = {
-  'chapter-bloom-path': {
-    skin: '#ffd9b8',
-    hair: '#ffb34a',
-    accent: '#6dd56f',
-    outfit: '#5fc777',
-    ring: '#ffe08d',
-    blush: '#ffb5a0',
-  },
-  'chapter-mirror-court': {
-    skin: '#ffe1d4',
-    hair: '#7cb7ff',
-    accent: '#ff95cb',
-    outfit: '#7b88ff',
-    ring: '#d6ebff',
-    blush: '#ffbfd7',
-  },
-}
-
-const DEFAULT_CHAPTER_GAME_AVATAR_SPEC = CHAPTER_GAME_AVATAR_SPECS['chapter-bloom-path']
-
-interface TileMascotSpec {
-  skin: string
-  fringe: string
-  accent: string
-  blush: string
-  eyes: 'bright' | 'smile' | 'sleepy' | 'wink' | 'gentle'
-  mouth: 'open' | 'smile' | 'cat' | 'tiny'
-  brows: 'bold' | 'cheer' | 'sleepy' | 'spark' | 'soft'
-}
-
-const TILE_MASCOT_SPECS: Record<TileType, TileMascotSpec> = {
-  ember: {
-    skin: '#ffe6c7',
-    fringe: '#ff994d',
-    accent: '#ff6b4d',
-    blush: '#ffb49f',
-    eyes: 'bright',
-    mouth: 'open',
-    brows: 'bold',
-  },
-  leaf: {
-    skin: '#fff0dc',
-    fringe: '#6dcf7c',
-    accent: '#98ec9e',
-    blush: '#f4c6a4',
-    eyes: 'smile',
-    mouth: 'smile',
-    brows: 'cheer',
-  },
-  bloom: {
-    skin: '#fff0e2',
-    fringe: '#ff8fba',
-    accent: '#ffc1de',
-    blush: '#ffbfd3',
-    eyes: 'bright',
-    mouth: 'smile',
-    brows: 'spark',
-  },
-  bell: {
-    skin: '#fff0c9',
-    fringe: '#ffcb56',
-    accent: '#ffe69f',
-    blush: '#f9c18f',
-    eyes: 'gentle',
-    mouth: 'open',
-    brows: 'soft',
-  },
-  cloud: {
-    skin: '#f8f5ff',
-    fringe: '#8fc7ff',
-    accent: '#dff2ff',
-    blush: '#d9caf7',
-    eyes: 'sleepy',
-    mouth: 'tiny',
-    brows: 'sleepy',
-  },
-  shell: {
-    skin: '#fff4e7',
-    fringe: '#7fd7ca',
-    accent: '#b4f1e7',
-    blush: '#f4c6bf',
-    eyes: 'gentle',
-    mouth: 'cat',
-    brows: 'soft',
-  },
-  berry: {
-    skin: '#fff0f6',
-    fringe: '#c57bff',
-    accent: '#efc9ff',
-    blush: '#ffc0dc',
-    eyes: 'wink',
-    mouth: 'smile',
-    brows: 'spark',
-  },
-  pine: {
-    skin: '#eef8e8',
-    fringe: '#59bf8b',
-    accent: '#a2e7be',
-    blush: '#cadbaf',
-    eyes: 'smile',
-    mouth: 'cat',
-    brows: 'cheer',
-  },
-  wave: {
-    skin: '#eefcff',
-    fringe: '#47c7e8',
-    accent: '#9ceffc',
-    blush: '#beddf0',
-    eyes: 'gentle',
-    mouth: 'smile',
-    brows: 'soft',
-  },
-}
-
-const TILE_MASCOT_INK = '#5d403d'
-
-function getChapterGameAvatarSpec(chapterId?: string | null) {
-  if (!chapterId) {
-    return DEFAULT_CHAPTER_GAME_AVATAR_SPEC
-  }
-
-  return CHAPTER_GAME_AVATAR_SPECS[chapterId] ?? DEFAULT_CHAPTER_GAME_AVATAR_SPEC
-}
-
-function renderStarEye(cx: number, cy: number, fill = '#fff067') {
-  const points = [
-    [cx, cy - 4.8],
-    [cx + 1.5, cy - 1.7],
-    [cx + 5, cy - 1.1],
-    [cx + 2.2, cy + 1.1],
-    [cx + 3.1, cy + 4.7],
-    [cx, cy + 2.7],
-    [cx - 3.1, cy + 4.7],
-    [cx - 2.2, cy + 1.1],
-    [cx - 5, cy - 1.1],
-    [cx - 1.5, cy - 1.7],
-  ]
-    .map(([x, y]) => `${x},${y}`)
-    .join(' ')
-
-  return <polygon points={points} fill={fill} stroke={TILE_MASCOT_INK} strokeWidth="1.8" />
-}
-
-function renderTileMascotAccessory(tileType: TileType, spec: TileMascotSpec) {
-  switch (tileType) {
-    case 'ember':
-      return (
-        <g
-          fill={spec.accent}
-          stroke={TILE_MASCOT_INK}
-          strokeWidth="2.1"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        >
-          <path
-            d="M42 6c6 5 12 11 12 19 0 7-4.9 12.1-12 14.4-7.1-2.3-12-7.4-12-14.4 0-8 6-14 12-19Z"
-          />
-          <path
-            d="M42 16c3.7 3.6 7 7.1 7 11.8 0 4.3-2.8 7.5-7 9.2-4.2-1.7-7-4.9-7-9.2 0-4.7 3.3-8.2 7-11.8Z"
-            fill={spec.fringe}
-          />
-        </g>
-      )
-    case 'leaf':
-      return (
-        <g stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinecap="round">
-          <ellipse
-            cx="31"
-            cy="18"
-            rx="7.8"
-            ry="13"
-            transform="rotate(-28 31 18)"
-            fill={spec.accent}
-          />
-          <ellipse
-            cx="53"
-            cy="18"
-            rx="7.8"
-            ry="13"
-            transform="rotate(28 53 18)"
-            fill={spec.fringe}
-          />
-          <path
-            d="M42 18v12"
-            fill="none"
-            stroke="#5f955f"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-          />
-        </g>
-      )
-    case 'bloom':
-      return (
-        <g stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="42" cy="14" r="6.2" fill={spec.accent} />
-          <circle cx="30" cy="18" r="5.8" fill={spec.accent} />
-          <circle cx="54" cy="18" r="5.8" fill={spec.accent} />
-          <circle cx="34" cy="28" r="5.8" fill={spec.accent} />
-          <circle cx="50" cy="28" r="5.8" fill={spec.accent} />
-          <circle cx="42" cy="21" r="5.2" fill={spec.fringe} />
-        </g>
-      )
-    case 'bell':
-      return (
-        <g stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M31 14c0-6.2 22-6.2 22 0v9H31Z" fill={spec.fringe} />
-          <path
-            d="M28 24c0-7.1 28-7.1 28 0 0 5.8-6.2 9.4-14 9.4S28 29.8 28 24Z"
-            fill={spec.accent}
-          />
-          <circle cx="42" cy="31" r="3.1" fill="#f5a23d" />
-        </g>
-      )
-    case 'cloud':
-      return (
-        <g stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="30" cy="22" r="8.5" fill={spec.accent} />
-          <circle cx="42" cy="16" r="10.5" fill={spec.accent} />
-          <circle cx="54" cy="22" r="8.5" fill={spec.accent} />
-          <ellipse cx="42" cy="25" rx="20" ry="8.5" fill={spec.fringe} />
-        </g>
-      )
-    case 'shell':
-      return (
-        <g stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path
-            d="M24 28c0-13 8.1-20 18-20s18 7 18 20H24Z"
-            fill={spec.fringe}
-          />
-          <path
-            d="M29 28V17M36 28V13M42 28V11M48 28V13M55 28V17"
-            fill="none"
-            stroke={spec.accent}
-            strokeWidth="2.2"
-            strokeLinecap="round"
-          />
-        </g>
-      )
-    case 'berry':
-      return (
-        <g stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="33" cy="18" r="7" fill={spec.fringe} />
-          <circle cx="51" cy="18" r="7" fill={spec.fringe} />
-          <path
-            d="M42 16c-5-8-12-7-12-7 3 4 4.5 8.2 4.5 8.2M42 16c5-8 12-7 12-7-3 4-4.5 8.2-4.5 8.2"
-            fill="none"
-            stroke={spec.accent}
-            strokeWidth="2.3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </g>
-      )
-    case 'pine':
-      return (
-        <g stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M42 8 32 22h20Z" fill={spec.accent} />
-          <path d="M42 14 28 31h28Z" fill={spec.fringe} />
-          <path d="M42 30v8" fill="none" stroke="#5b876c" strokeWidth="2.4" strokeLinecap="round" />
-        </g>
-      )
-    case 'wave':
-      return (
-        <g stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path
-            d="M25 22c7-11 20-14 31-8-5 .7-8.3 3.8-8.3 8.1 0 4.5 4.1 7.9 10.3 8.6-8.3 6.8-20.7 6.5-29.4 1.1-6.5-4.1-8.2-7.2-3.6-9.8Z"
-            fill={spec.fringe}
-          />
-          <circle cx="56" cy="18" r="5.7" fill={spec.accent} />
-        </g>
-      )
-  }
-}
-
-function renderTileMascotMoodDecor(mood: TileMascotMood, theme: TileTheme) {
-  switch (mood) {
-    case 'board-hinted':
-      return (
-        <>
-          <path
-            d="M23 22c2.6-4.2 5.9-6.6 10.4-7.8"
-            fill="none"
-            stroke="#fff6a6"
-            strokeWidth="3"
-            strokeLinecap="round"
-          />
-          <path
-            d="M61 13c1.8 4 2.1 7.4.7 11.2"
-            fill="none"
-            stroke="#fff6a6"
-            strokeWidth="3"
-            strokeLinecap="round"
-          />
-          <path
-            d="M66 31c4.5-1.9 7.3-2.2 11.2-.9"
-            fill="none"
-            stroke="#fff6a6"
-            strokeWidth="3"
-            strokeLinecap="round"
-          />
-        </>
-      )
-    case 'tray':
-      return (
-        <path
-          d="M58 23c3.1 1.4 4.4 4.8 3 7.7-1 2.1-3.3 3.1-5.7 2.8.5-3.9 1.2-7.4 2.7-10.5Z"
-          fill="#8fd8ff"
-          stroke={TILE_MASCOT_INK}
-          strokeWidth="1.7"
-          strokeLinejoin="round"
-        />
-      )
-    case 'burst':
-      return (
-        <>
-          <path
-            d="M18 21 23 26 30 24 27 31 31 38 24 36 19 42 18 34 11 31 18 28 18 21Z"
-            fill={theme.accent}
-            stroke={TILE_MASCOT_INK}
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M66 18 70 24 77 23 73 29 77 35 70 34 66 40 65 32 58 29 65 26 66 18Z"
-            fill="#fff4a8"
-            stroke={TILE_MASCOT_INK}
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-          />
-        </>
-      )
-    default:
-      return null
-  }
-}
-
-function renderTileMascotActiveFace(tileType: TileType) {
-  switch (tileType) {
-    case 'ember':
-      return (
-        <>
-          <path d="M27 31c4.2-2.9 8-3.5 11.7-2" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.8" strokeLinecap="round" />
-          <path d="M47 30c3.8-.7 7 .1 10 2.8" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.8" strokeLinecap="round" />
-          <ellipse cx="33.4" cy="39.5" rx="2.7" ry="3.3" fill="#4f2f4d" />
-          <path d="M47 39c2.2-2.6 5.5-2.8 7.6-.3" fill="none" stroke="#4f2f4d" strokeWidth="2.7" strokeLinecap="round" />
-          <path d="M35 51c4.4-3.2 10.1-2.7 14 1" fill="none" stroke="#8f4c61" strokeWidth="3" strokeLinecap="round" />
-          <path d="M45 51.5c1.2 2.8 3.5 4 6 3.1" fill="none" stroke="#8f4c61" strokeWidth="2.4" strokeLinecap="round" />
-          <path d="M49 54c.2 2.1-.6 3.8-2.1 5" fill="none" stroke="#ff8c79" strokeWidth="2.4" strokeLinecap="round" />
-        </>
-      )
-    case 'leaf':
-      return (
-        <>
-          <path d="M29 30.5c2.7-1.4 5.9-1 8.5 1" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
-          <path d="M46 30c2.9-1.8 6.5-1.7 9.5.4" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
-          <path d="M29 40c2.1-2.7 5.2-2.7 7.3 0" fill="none" stroke="#4f2f4d" strokeWidth="2.7" strokeLinecap="round" />
-          <path d="M47 40c2.1-2.7 5.2-2.7 7.3 0" fill="none" stroke="#4f2f4d" strokeWidth="2.7" strokeLinecap="round" />
-          <path d="M35 49.5c2.3 2.3 4.4 3.4 7 4.1 2.6-.7 4.7-1.8 7-4.1" fill="none" stroke="#8f4c61" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-        </>
-      )
-    case 'bloom':
-      return (
-        <>
-          <path d="M28 30.5c3.5-3 7.2-3.2 10.8-.6" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.4" strokeLinecap="round" />
-          <path d="M47 30.5c3.1-2.2 6.3-2.1 9.6.2" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.4" strokeLinecap="round" />
-          <ellipse cx="34" cy="39.4" rx="2.7" ry="2.4" fill="#4f2f4d" />
-          <ellipse cx="51.4" cy="39.4" rx="2.7" ry="2.4" fill="#4f2f4d" />
-          <path d="M35 51c3-1.6 5.5-2.2 7.8-2.2 2.8 0 5.2.8 7.1 2.7" fill="none" stroke="#8f4c61" strokeWidth="2.8" strokeLinecap="round" />
-          <circle cx="54.8" cy="44.2" r="1.1" fill="#4f2f4d" />
-        </>
-      )
-    case 'bell':
-      return (
-        <>
-          <path d="M29 31c3-1.8 6.6-1.9 9.6-.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
-          <path d="M46 31c3-1.8 6.6-1.9 9.6-.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
-          <ellipse cx="33.2" cy="39.5" rx="3.1" ry="3.5" fill="#4f2f4d" />
-          <ellipse cx="50.8" cy="39.5" rx="3.1" ry="3.5" fill="#4f2f4d" />
-          <path d="M35 50c2 4.2 12 4.2 14 0" fill="#fff4ef" stroke="#8f4c61" strokeWidth="2.5" strokeLinejoin="round" />
-        </>
-      )
-    case 'cloud':
-      return (
-        <>
-          <path d="M29 31.8c2.5-1 5.3-.9 8.2 0" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="2.8" strokeLinecap="round" />
-          <path d="M46 31.2c2.8-1.2 5.8-.8 8.6.7" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="2.8" strokeLinecap="round" />
-          <path d="M29.5 40.4c2.1-1.5 4.7-1.5 6.8 0" fill="none" stroke="#4f2f4d" strokeWidth="2.5" strokeLinecap="round" />
-          <ellipse cx="50.8" cy="39.8" rx="2.6" ry="2.2" fill="#4f2f4d" />
-          <path d="M38 50.4c2.8-.9 5.3-.7 7.6 1" fill="none" stroke="#8f4c61" strokeWidth="2.7" strokeLinecap="round" />
-        </>
-      )
-    case 'shell':
-      return (
-        <>
-          <path d="M28 31.2c3-1.6 6.2-1.2 9 .7" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
-          <path d="M47 29.8c3.7-2 6.8-1.6 9.4 1" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
-          <ellipse cx="33.2" cy="39.5" rx="2.7" ry="2.2" fill="#4f2f4d" />
-          <path d="M47 40c2.2-2.1 5-2.1 7.2 0" fill="none" stroke="#4f2f4d" strokeWidth="2.7" strokeLinecap="round" />
-          <path d="M35 49.8c2.2 2 4 2.9 7 3.6 2.1-.6 4.2-1.6 7-3.6" fill="none" stroke="#8f4c61" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-        </>
-      )
-    case 'berry':
-      return (
-        <>
-          <path d="M28 30.2c3.7-2.8 7.2-3.1 10.4-.8" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.4" strokeLinecap="round" />
-          <path d="M47 31.3c2.9-1.8 6.2-1.5 9.1.8" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.4" strokeLinecap="round" />
-          <circle cx="33" cy="39.3" r="2.7" fill="#4f2f4d" />
-          <path d="M47.2 39.5c2.1-2.6 5.2-2.6 7.1-.2" fill="none" stroke="#4f2f4d" strokeWidth="2.6" strokeLinecap="round" />
-          <path d="M36 49.8c3.8 1.9 7.4 1.8 11.1-.3" fill="none" stroke="#8f4c61" strokeWidth="2.7" strokeLinecap="round" />
-          <path d="M48 50.6c1.9 1.4 2.3 3.5 1.4 5.6" fill="none" stroke="#ff7c97" strokeWidth="2.5" strokeLinecap="round" />
-        </>
-      )
-    case 'pine':
-      return (
-        <>
-          <path d="M28.5 31.2c2.6-1.7 5.8-1.4 8.6.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
-          <path d="M47 30.5c2.6-2 5.8-2 8.7-.1" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
-          <circle cx="33.2" cy="39.5" r="2.5" fill="#4f2f4d" />
-          <circle cx="50.8" cy="40.6" r="2.1" fill="#4f2f4d" />
-          <path d="M34.4 50.2c2 3.8 13.2 3.8 15.2 0v2.6c0 2.1-3 4.4-7.6 4.4-4.6 0-7.6-2.3-7.6-4.4v-2.6Z" fill="#fff6ee" stroke="#8f4c61" strokeWidth="2.4" strokeLinejoin="round" />
-          <path d="M39.7 50.2v5.1M44.3 50.2v5.1" fill="none" stroke="#8f4c61" strokeWidth="1.8" strokeLinecap="round" />
-        </>
-      )
-    case 'wave':
-      return (
-        <>
-          <path d="M28.5 31.7c2.6-1.3 5.3-1.4 8.2-.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3" strokeLinecap="round" />
-          <path d="M46.5 31c3-1.8 6.1-1.5 8.8.8" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3" strokeLinecap="round" />
-          <ellipse cx="33.2" cy="39.7" rx="2.8" ry="2.3" fill="#4f2f4d" />
-          <ellipse cx="50.8" cy="39.7" rx="2.8" ry="2.3" fill="#4f2f4d" />
-          <path d="M35.2 50.8c4.2-2.6 8.8-2.3 12.8.9" fill="none" stroke="#8f4c61" strokeWidth="2.8" strokeLinecap="round" />
-        </>
-      )
-  }
-}
-
-function renderTileMascotFace(tileType: TileType, mood: TileMascotMood) {
-  switch (mood) {
-    case 'board-blocked':
-      return (
-        <>
-          <path d="M28 32.4c2.7-2 5.8-2.4 9.2-1.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.1" strokeLinecap="round" />
-          <path d="M46.8 31.6c3.2-1.7 6.4-1.6 9.4.5" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.1" strokeLinecap="round" />
-          <ellipse cx="33.4" cy="40.1" rx="4.8" ry="5.2" fill="#fffdf7" stroke={TILE_MASCOT_INK} strokeWidth="1.8" />
-          <ellipse cx="50.6" cy="40.1" rx="4.8" ry="5.2" fill="#fffdf7" stroke={TILE_MASCOT_INK} strokeWidth="1.8" />
-          <circle cx="36.8" cy="40.4" r="2.2" fill="#4f2f4d" />
-          <circle cx="47.2" cy="40.4" r="2.2" fill="#4f2f4d" />
-          <path d="M35 52c2.5-1.3 4.8-1.8 7-1.8 2.2 0 4.5.5 7 1.8" fill="none" stroke="#8f4c61" strokeWidth="2.6" strokeLinecap="round" />
-        </>
-      )
-    case 'board-hinted':
-      return (
-        <>
-          <path d="M28 28.8c3.7-4.1 7.8-4.5 11.8-1.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.5" strokeLinecap="round" />
-          <path d="M45 28.8c3.7-4.1 7.8-4.5 11.8-1.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.5" strokeLinecap="round" />
-          <ellipse cx="33.2" cy="40.2" rx="4.8" ry="6.2" fill="#fffdf7" stroke={TILE_MASCOT_INK} strokeWidth="1.8" />
-          <ellipse cx="50.8" cy="40.2" rx="4.8" ry="6.2" fill="#fffdf7" stroke={TILE_MASCOT_INK} strokeWidth="1.8" />
-          <circle cx="33.2" cy="41.2" r="2.1" fill="#4f2f4d" />
-          <circle cx="50.8" cy="41.2" r="2.1" fill="#4f2f4d" />
-          <ellipse cx="42" cy="52.3" rx="5.1" ry="6" fill="#fff6ee" stroke="#8f4c61" strokeWidth="2.4" />
-        </>
-      )
-    case 'tray':
-      return (
-        <>
-          <path d="M28.6 33c2.8 1.5 5.8 1.4 8.6-.4" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.1" strokeLinecap="round" />
-          <path d="M46.8 32.8c2.7 1.7 5.7 1.8 8.6.4" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.1" strokeLinecap="round" />
-          <ellipse cx="33.4" cy="40.6" rx="3.3" ry="3.9" fill="#fffdf7" stroke={TILE_MASCOT_INK} strokeWidth="1.4" />
-          <ellipse cx="50.6" cy="40.6" rx="3.3" ry="3.9" fill="#fffdf7" stroke={TILE_MASCOT_INK} strokeWidth="1.4" />
-          <circle cx="33.4" cy="41.7" r="1.6" fill="#4f2f4d" />
-          <circle cx="50.6" cy="41.7" r="1.6" fill="#4f2f4d" />
-          <path d="M35 52.2c2.3-1.7 4.6-2.4 7-2.4 2.4 0 4.7.7 7 2.4" fill="none" stroke="#8f4c61" strokeWidth="2.5" strokeLinecap="round" />
-        </>
-      )
-    case 'burst':
-      return (
-        <>
-          <path d="M28 31.4c3.1-2.2 6.7-2.4 10-.6" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
-          <path d="M46 31.4c3.1-2.2 6.7-2.4 10-.6" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="3.2" strokeLinecap="round" />
-          {renderStarEye(33, 39.5)}
-          {renderStarEye(51, 39.5)}
-          <path d="M33 49.5c2.5 6 15.5 6 18 0v3c0 3.1-4.2 7-9 7-4.8 0-9-3.9-9-7v-3Z" fill="#7f2233" stroke="#8f4c61" strokeWidth="2.6" strokeLinejoin="round" />
-          <path d="M38 56.3c2.5 2.2 5.5 2.2 8 0" fill="none" stroke="#ff9ba5" strokeWidth="2.8" strokeLinecap="round" />
-        </>
-      )
-    case 'board-active':
-    default:
-      return renderTileMascotActiveFace(tileType)
-  }
-}
-
-function TileMascot({
-  tileType,
-  theme,
-  mood,
-  compact = false,
-}: {
-  tileType: TileType
-  theme: TileTheme
-  mood: TileMascotMood
-  compact?: boolean
-}) {
-  const spec = TILE_MASCOT_SPECS[tileType]
-  const faceTransform =
-    mood === 'board-blocked'
-      ? 'translate(0 4) scale(1 0.94)'
-      : mood === 'burst'
-        ? 'translate(0 -1)'
-        : undefined
-
-  return (
-    <span
-      className={`tile-mascot tile-mascot--${mood}${compact ? ' tile-mascot--compact' : ''}`}
-      aria-hidden="true"
-    >
-      <svg viewBox="0 0 84 84" className="tile-mascot__svg" focusable="false">
-        <ellipse cx="42" cy="75" rx="17" ry="5" fill="rgba(80, 48, 75, 0.12)" />
-        {renderTileMascotAccessory(tileType, spec)}
-        <path
-          d="M26 70c3.5-8.6 10.5-13.5 16-13.5s12.5 4.9 16 13.5V78H26Z"
-          fill={theme.main}
-          stroke={TILE_MASCOT_INK}
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M32 68c2.6-4.6 6-7.2 10-7.2s7.4 2.6 10 7.2"
-          fill="none"
-          stroke={theme.accent}
-          strokeWidth="4"
-          strokeLinecap="round"
-        />
-        <g transform={faceTransform}>
-          <path
-            d="M21 42c0-13.6 9.5-24.2 21-24.2s21 10.6 21 24.2S53.5 62.4 42 62.4 21 55.6 21 42Z"
-            fill={spec.skin}
-            stroke={TILE_MASCOT_INK}
-            strokeWidth="2.4"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M20 37c2.8-14.5 11.9-22.5 22-22.5 9.7 0 18.6 5.9 22 18.5-7.2-4.6-14-6.2-22-6.2-8.7 0-15.6 2.7-22 10.2Z"
-            fill={spec.fringe}
-            stroke={TILE_MASCOT_INK}
-            strokeWidth="2.3"
-            strokeLinejoin="round"
-          />
-          <circle cx="31" cy="47" r="4.1" fill={spec.blush} fillOpacity={mood === 'burst' ? 0.84 : 0.66} />
-          <circle cx="53" cy="47" r="4.1" fill={spec.blush} fillOpacity={mood === 'burst' ? 0.84 : 0.66} />
-          <path
-            d="M39 46.8c1.2 1.1 2.4 1.3 3.5 0"
-            fill="none"
-            stroke="#b98074"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-          />
-          {renderTileMascotFace(tileType, mood)}
-          <circle cx="35" cy="33" r="2.7" fill="rgba(255,255,255,0.28)" />
-        </g>
-        {renderTileMascotMoodDecor(mood, theme)}
-      </svg>
-    </span>
-  )
-}
-
-function renderChapterGameAvatarFace(mood: ChapterGameAvatarMood) {
-  switch (mood) {
-    case 'win':
-      return (
-        <>
-          <path d="M39 46c3-3.7 7.4-3.7 10.4 0" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="4.4" strokeLinecap="round" />
-          <path d="M67 46c3-3.7 7.4-3.7 10.4 0" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="4.4" strokeLinecap="round" />
-          <path d="M39 66c4 9 20 9 24 0v4c0 5-5.6 10.2-12 10.2S39 75 39 70v-4Z" fill="#7d2233" stroke="#8f4c61" strokeWidth="3.5" strokeLinejoin="round" />
-          <path d="M46 73c3 2.2 7 2.2 10 0" fill="none" stroke="#ff9ca6" strokeWidth="3" strokeLinecap="round" />
-        </>
-      )
-    case 'loss':
-      return (
-        <>
-          <path d="M40 41c4-2.2 7.8-2.2 11.4 0" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="4" strokeLinecap="round" />
-          <path d="M63 42c3.4-2.7 7.4-2.8 10.7-.2" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="4" strokeLinecap="round" />
-          <ellipse cx="45" cy="54" rx="4.4" ry="5.4" fill="#fffdf7" stroke={TILE_MASCOT_INK} strokeWidth="2" />
-          <ellipse cx="69" cy="54" rx="4.4" ry="5.4" fill="#fffdf7" stroke={TILE_MASCOT_INK} strokeWidth="2" />
-          <circle cx="47.8" cy="55" r="2.2" fill="#4f2f4d" />
-          <circle cx="66.2" cy="55" r="2.2" fill="#4f2f4d" />
-          <path d="M47 72c3.2-2.5 6.6-3.5 10-3.5 3.4 0 6.8 1 10 3.5" fill="none" stroke="#8f4c61" strokeWidth="3.4" strokeLinecap="round" />
-        </>
-      )
-    case 'bar':
-    default:
-      return (
-        <>
-          <path d="M39 42c4.4-3.2 8.5-3.6 12.5-1.3" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="4.2" strokeLinecap="round" />
-          <path d="M64 41c3.8-2 7.5-1.8 10.7.8" fill="none" stroke={TILE_MASCOT_INK} strokeWidth="4.2" strokeLinecap="round" />
-          <circle cx="45" cy="54" r="3.6" fill="#4f2f4d" />
-          <path d="M65 54c2.8-3.4 7-3.4 9.4 0" fill="none" stroke="#4f2f4d" strokeWidth="3.6" strokeLinecap="round" />
-          <path d="M44 71c5-3.3 11.2-3 16.4.9" fill="none" stroke="#8f4c61" strokeWidth="3.6" strokeLinecap="round" />
-        </>
-      )
-  }
-}
-
-function renderChapterGameAvatarDecor(mood: ChapterGameAvatarMood, spec: ChapterGameAvatarSpec) {
-  switch (mood) {
-    case 'win':
-      return (
-        <>
-          <path d="M20 30 26 37 35 34 31 43 37 51 28 49 22 57 21 47 12 43 21 39 20 30Z" fill={spec.accent} stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinejoin="round" />
-          <path d="M89 22 95 29 104 26 100 35 106 43 97 41 91 49 90 39 81 35 90 31 89 22Z" fill="#fff4a6" stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinejoin="round" />
-        </>
-      )
-    case 'loss':
-      return (
-        <path
-          d="M82 31c4.7 2.1 6.7 7.3 4.5 11.7-1.4 3.1-4.9 4.7-8.6 4.1.8-5.9 1.9-11 4.1-15.8Z"
-          fill="#8fd8ff"
-          stroke={TILE_MASCOT_INK}
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
-      )
-    default:
-      return (
-        <path d="M86 22 89 31 98 34 89 37 86 46 83 37 74 34 83 31 86 22Z" fill="#fff4a6" stroke={TILE_MASCOT_INK} strokeWidth="2" strokeLinejoin="round" />
-      )
-  }
-}
-
-function ChapterGameAvatar({
-  chapterId,
-  mood,
-  label,
-}: {
-  chapterId?: string | null
-  mood: ChapterGameAvatarMood
-  label: string
-}) {
-  const spec = getChapterGameAvatarSpec(chapterId)
-
-  return (
-    <span className={`chapter-game-avatar chapter-game-avatar--${mood}`} role="img" aria-label={label}>
-      <svg viewBox="0 0 120 120" className="chapter-game-avatar__svg" focusable="false" aria-hidden="true">
-        <circle cx="60" cy="60" r="50" fill={spec.ring} stroke={TILE_MASCOT_INK} strokeWidth="4.6" />
-        <circle cx="60" cy="60" r="43" fill="rgba(255,255,255,0.55)" stroke="rgba(255,255,255,0.9)" strokeWidth="2.8" />
-        <path d="M35 103c4-18 15.5-28 25-28s21 10 25 28v8H35v-8Z" fill={spec.outfit} stroke={TILE_MASCOT_INK} strokeWidth="4.4" strokeLinejoin="round" />
-        <path d="M44 85c4.3 4.5 8.9 6.6 13 6.6S65.7 89.5 70 85" fill="none" stroke="#f4fff4" strokeWidth="4.8" strokeLinecap="round" />
-        <path d="M30 54c0-19 12-34 27-34s27 15 27 34-12 33-27 33-27-14-27-33Z" fill={spec.skin} stroke={TILE_MASCOT_INK} strokeWidth="4.4" />
-        <path d="M30 49c3-21 16-32 30-32 13 0 25.6 7.8 30 26-8-5.5-16.7-7.7-30-7.7-12.1 0-20.8 4.2-30 13.7Z" fill={spec.hair} stroke={TILE_MASCOT_INK} strokeWidth="4.2" strokeLinejoin="round" />
-        <path d="M60 21c7.8-8.2 17.3-8.9 26.6-3.6-1.8 9.8-9.4 15.1-19.8 16.8L60 21Z" fill={spec.accent} stroke={TILE_MASCOT_INK} strokeWidth="3.8" strokeLinejoin="round" />
-        <path d="M52 19c-6.4-6.1-13.9-6.3-21-.8 1.1 7.8 7 12.3 14.7 13.9L52 19Z" fill="#fff0a8" stroke={TILE_MASCOT_INK} strokeWidth="3.4" strokeLinejoin="round" />
-        <circle cx="43" cy="64" r="6.6" fill={spec.blush} fillOpacity="0.68" />
-        <circle cx="77" cy="64" r="6.6" fill={spec.blush} fillOpacity="0.68" />
-        <path d="M57 60c1.4 1.2 2.8 1.3 4 0" fill="none" stroke="#c28674" strokeWidth="2.2" strokeLinecap="round" />
-        {renderChapterGameAvatarFace(mood)}
-        {renderChapterGameAvatarDecor(mood, spec)}
-      </svg>
-    </span>
-  )
-}
+const DEFAULT_CHAPTER_THEME = CHAPTER_SURFACE_THEMES['chapter-bloom-path']
 
 function createGameReducer(level: LevelDefinition, config: GameConfig) {
   return (state: GameState, action: GameAction): GameState => {
@@ -826,28 +276,6 @@ function createGameReducer(level: LevelDefinition, config: GameConfig) {
         return state
     }
   }
-}
-
-function getTileStyle(tile: TileDefinition) {
-  const theme = TILE_THEMES[tile.type]
-
-  return {
-    left: `${tile.x}px`,
-    top: `${tile.y}px`,
-    zIndex: tile.layer * 10 + Math.round(tile.y / 10),
-    '--tile-main': theme.main,
-    '--tile-accent': theme.accent,
-    '--tile-shadow': theme.shadow,
-    '--tile-outline': theme.outline,
-    '--tile-pattern': theme.pattern,
-  } as CSSProperties
-}
-
-function getBurstStyle(slotIndex: number) {
-  return {
-    gridColumnStart: slotIndex + 1,
-    gridRowStart: 1,
-  } as CSSProperties
 }
 
 function calculateLevelStars(level: LevelDefinition, selectedCount: number) {
@@ -886,10 +314,23 @@ function getStarText(stars: number) {
 
 function getRecommendedGoal(level: LevelDefinition) {
   if (typeof level.campaign?.recommendedSelectionCount !== 'number') {
-    return '稳扎稳打'
+    return '稳稳推进'
   }
 
   return `推荐 ${level.campaign.recommendedSelectionCount} 次内`
+}
+
+function getQuickPlayLevel(
+  campaignLevels: LevelDefinition[],
+  progress: CampaignProgress,
+  fallbackLevel: LevelDefinition,
+) {
+  return (
+    campaignLevels
+      .slice()
+      .reverse()
+      .find((level) => progress.levelRecords[level.id]?.unlocked) ?? fallbackLevel
+  )
 }
 
 function getChapterSummaries(
@@ -909,26 +350,312 @@ function getChapterSummaries(
   })
 }
 
-function getChapterAvatarTheme(
-  chapter?: CampaignChapterDefinition | null,
-): ChapterAvatarTheme {
+function getChapterTheme(chapter?: CampaignChapterDefinition | null): ChapterSurfaceTheme {
   if (!chapter) {
-    return DEFAULT_CHAPTER_AVATAR_THEME
+    return DEFAULT_CHAPTER_THEME
   }
 
   return (
-    CHAPTER_AVATAR_THEMES[chapter.id] ??
-    (chapter.order % 2 === 0
-      ? CHAPTER_AVATAR_THEMES['chapter-mirror-court']
-      : CHAPTER_AVATAR_THEMES['chapter-bloom-path']) ??
-    DEFAULT_CHAPTER_AVATAR_THEME
+    CHAPTER_SURFACE_THEMES[chapter.id] ?? {
+      accent: chapter.accentColor ?? DEFAULT_CHAPTER_THEME.accent,
+      accentSoft: '#dfe6df',
+      feltGlow: 'rgba(188, 201, 189, 0.18)',
+      seal: String(chapter.order),
+      sealLabel: chapter.title,
+    }
   )
 }
 
-function getChapterThemeStyle(theme: ChapterAvatarTheme) {
+function getChapterThemeStyle(theme: ChapterSurfaceTheme) {
   return {
     '--chapter-accent': theme.accent,
     '--chapter-accent-soft': theme.accentSoft,
+    '--chapter-felt-glow': theme.feltGlow,
+  } as CSSProperties
+}
+
+function renderDot(cx: number, cy: number, ink: string, accentInk: string) {
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r="11" fill={ink} />
+      <circle cx={cx - 1.5} cy={cy - 1.5} r="5.4" fill="#f8f3e9" />
+      <circle cx={cx + 3} cy={cy + 3} r="4.7" fill={accentInk} />
+    </g>
+  )
+}
+
+function renderStick(x: number, y: number, ink: string, accentInk: string) {
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <rect x="0" y="2" width="10" height="30" rx="5" fill={ink} />
+      <rect x="2.4" y="5" width="5.2" height="10" rx="2.6" fill={accentInk} opacity="0.38" />
+      <rect x="2.4" y="18" width="5.2" height="10" rx="2.6" fill={accentInk} opacity="0.38" />
+    </g>
+  )
+}
+
+function renderBambooCluster(kind: TileTheme['glyphKind'], ink: string, accentInk: string) {
+  const positions =
+    kind === 'bamboo-2'
+      ? [
+          [33, 30],
+          [53, 30],
+        ]
+      : kind === 'bamboo-3'
+        ? [
+            [24, 26],
+            [43, 26],
+            [62, 26],
+          ]
+        : kind === 'bamboo-4'
+          ? [
+              [28, 20],
+              [48, 20],
+              [28, 54],
+              [48, 54],
+            ]
+          : [
+              [18, 18],
+              [38, 18],
+              [58, 18],
+              [28, 52],
+              [48, 52],
+            ]
+
+  return positions.map(([x, y], index) => (
+    <g key={`${kind}-${index}`}>{renderStick(x, y, ink, accentInk)}</g>
+  ))
+}
+
+function renderDotCluster(kind: TileTheme['glyphKind'], ink: string, accentInk: string) {
+  const positions =
+    kind === 'dots-2'
+      ? [
+          [34, 34],
+          [62, 62],
+        ]
+      : kind === 'dots-4'
+        ? [
+            [33, 30],
+            [62, 30],
+            [33, 62],
+            [62, 62],
+          ]
+        : kind === 'dots-5'
+          ? [
+              [28, 28],
+              [58, 28],
+              [43, 46],
+              [28, 66],
+              [58, 66],
+            ]
+          : [
+              [26, 24],
+              [56, 24],
+              [26, 46],
+              [56, 46],
+              [26, 68],
+              [56, 68],
+            ]
+
+  return positions.map(([x, y], index) => (
+    <g key={`${kind}-${index}`}>{renderDot(x, y, ink, accentInk)}</g>
+  ))
+}
+
+function renderMahjongGlyph(theme: TileTheme) {
+  const ink = theme.ink
+  const accentInk = theme.accentInk
+
+  switch (theme.glyphKind) {
+    case 'dog':
+      return (
+        <>
+          <path d="M24 76V32l16 10 16-8 12 12v30H24Z" fill={ink} />
+          <path d="M36 42 30 30 22 42M56 38l8-12 10 14" fill={ink} />
+          <circle cx="47" cy="54" r="2.6" fill="#f7f2e8" />
+          <path d="M52 64c8 2 12 5 16 12" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
+          <path d="M34 69h18" fill="none" stroke={accentInk} strokeWidth="3.8" strokeLinecap="round" />
+        </>
+      )
+    case 'cat':
+      return (
+        <>
+          <path d="M30 74c0-20 9-34 22-34 12 0 20 11 20 28 0 11-5 18-16 18H30Z" fill={ink} />
+          <path d="M35 44 28 28 40 38M58 36l10-12 6 18" fill={ink} />
+          <circle cx="48" cy="52" r="2.4" fill="#f7f2e8" />
+          <path d="M60 74c8 0 13-7 13-16 0-10-6-18-14-22" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
+          <path d="M26 55h12M60 55h12" fill="none" stroke={accentInk} strokeWidth="2.8" strokeLinecap="round" />
+        </>
+      )
+    case 'fish':
+      return (
+        <>
+          <path d="M20 57c10-18 24-24 40-20 12 3 18 10 20 19-7 1-11 4-15 12-7 14-22 18-45 11 4-5 6-11 6-18s-2-10-6-14Z" fill={ink} />
+          <path d="m20 57-8-15 2 30 8-15ZM54 45c6 4 10 6 14 7-5 2-9 5-12 10" fill={accentInk} />
+          <circle cx="49" cy="52" r="3" fill="#f7f2e8" />
+        </>
+      )
+    case 'dragon':
+      return (
+        <>
+          <path d="M21 65c8-23 21-36 41-36 10 0 18 4 24 11-10 2-16 8-18 17 0 12-8 20-23 24-8 2-16 0-24-4 7-2 11-6 13-12H21Z" fill={ink} />
+          <path d="M54 37c6 2 11 5 15 11M33 70c8 0 14-3 19-8" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
+          <circle cx="54" cy="48" r="3" fill="#f7f2e8" />
+        </>
+      )
+    case 'rat':
+      return (
+        <>
+          <path d="M26 74c0-18 10-33 24-33 13 0 22 12 22 26 0 11-7 19-18 19H26Z" fill={ink} />
+          <circle cx="48" cy="46" r="7" fill={ink} />
+          <circle cx="42" cy="39" r="5" fill={ink} />
+          <circle cx="55" cy="50" r="2.2" fill="#f7f2e8" />
+          <path d="M63 74c11-1 18-8 18-17 0-8-5-13-13-15" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
+        </>
+      )
+    case 'monkey':
+      return (
+        <>
+          <circle cx="48" cy="42" r="11" fill={ink} />
+          <path d="M28 78c0-20 10-34 24-34 13 0 23 12 23 27 0 10-6 17-17 17H28Z" fill={ink} />
+          <path d="M30 66c-6 0-12 5-12 13 0 8 6 13 13 13" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
+          <path d="M59 65c6 7 11 10 17 10" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
+          <circle cx="65" cy="55" r="6" fill={accentInk} />
+        </>
+      )
+    case 'dots-2':
+    case 'dots-4':
+    case 'dots-5':
+    case 'dots-6':
+      return <>{renderDotCluster(theme.glyphKind, ink, accentInk)}</>
+    case 'bamboo-2':
+    case 'bamboo-3':
+    case 'bamboo-4':
+    case 'bamboo-5':
+      return <>{renderBambooCluster(theme.glyphKind, ink, accentInk)}</>
+    case 'east':
+      return (
+        <text x="48" y="72" textAnchor="middle" fontSize="54" fontWeight="900" fill={ink}>
+          东
+        </text>
+      )
+    case 'south':
+      return (
+        <text x="48" y="72" textAnchor="middle" fontSize="54" fontWeight="900" fill={ink}>
+          南
+        </text>
+      )
+    case 'frame-red':
+      return (
+        <>
+          <rect x="24" y="25" width="46" height="54" rx="4" fill="none" stroke={ink} strokeWidth="6" />
+          <path d="M24 33h12M58 25v12M70 69H58M36 79V67" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
+        </>
+      )
+    case 'frame-green':
+      return (
+        <>
+          <rect x="24" y="25" width="46" height="54" rx="4" fill="none" stroke={ink} strokeWidth="6" />
+          <path d="M24 33h12M58 25v12M70 69H58M36 79V67" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
+        </>
+      )
+    case 'blossom':
+      return (
+        <>
+          <circle cx="48" cy="52" r="8" fill={accentInk} />
+          <circle cx="48" cy="34" r="10" fill={ink} />
+          <circle cx="64" cy="44" r="10" fill={ink} />
+          <circle cx="58" cy="62" r="10" fill={ink} />
+          <circle cx="38" cy="62" r="10" fill={ink} />
+          <circle cx="32" cy="44" r="10" fill={ink} />
+        </>
+      )
+    case 'gourd':
+      return (
+        <>
+          <circle cx="48" cy="38" r="14" fill={ink} />
+          <circle cx="48" cy="62" r="20" fill={ink} />
+          <path d="M48 19c4 0 8 2 10 5" fill="none" stroke={accentInk} strokeWidth="4" strokeLinecap="round" />
+          <circle cx="42" cy="34" r="4" fill="#f7f2e8" opacity="0.35" />
+        </>
+      )
+    default:
+      return <circle cx="48" cy="54" r="18" fill={ink} />
+  }
+}
+
+function CardFace({
+  theme,
+  mood,
+  compact = false,
+}: {
+  theme: TileTheme
+  mood: TileMood
+  compact?: boolean
+}) {
+  return (
+    <span className={`card-face card-face--${mood}${compact ? ' card-face--compact' : ''}`} aria-hidden="true">
+      <svg viewBox="0 0 96 112" className="card-face__art" focusable="false">
+        {renderMahjongGlyph(theme)}
+      </svg>
+      <span className="card-face__badge">{theme.label}</span>
+    </span>
+  )
+}
+
+function ChapterSeal({
+  chapter,
+  emphasis = 'normal',
+}: {
+  chapter?: CampaignChapterDefinition | null
+  emphasis?: 'normal' | 'large' | 'small'
+}) {
+  const theme = getChapterTheme(chapter)
+
+  return (
+    <span
+      className={`chapter-seal chapter-seal--${emphasis}`}
+      style={getChapterThemeStyle(theme)}
+      aria-label={theme.sealLabel}
+    >
+      <span className="chapter-seal__rim" />
+      <strong>{theme.seal}</strong>
+      <em>{theme.sealLabel}</em>
+    </span>
+  )
+}
+
+function getTileStyle(tile: TileDefinition) {
+  const theme = TILE_THEMES[tile.type]
+
+  return {
+    left: `${tile.x}px`,
+    top: `${tile.y}px`,
+    zIndex: tile.layer * 10 + Math.round(tile.y / 10),
+    '--tile-ink': theme.ink,
+    '--tile-accent-ink': theme.accentInk,
+    '--tile-shadow': theme.shadowGlow,
+    '--tile-pattern': theme.facePattern,
+  } as CSSProperties
+}
+
+function getTrayStyle(tileType: TileType, config: GameConfig) {
+  const theme = TILE_THEMES[tileType]
+
+  return {
+    '--tile-ink': theme.ink,
+    '--tile-accent-ink': theme.accentInk,
+    '--tile-shadow': theme.shadowGlow,
+    '--tile-pattern': theme.facePattern,
+    '--entry-duration': `${config.animationMs.trayEntry}ms`,
+  } as CSSProperties
+}
+
+function getBurstStyle(slotIndex: number) {
+  return {
+    gridColumnStart: slotIndex + 1,
+    gridRowStart: 1,
   } as CSSProperties
 }
 
@@ -942,24 +669,27 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     () => loadCampaignProgress(campaign).currentLevelId || fallbackLevel.id,
   )
   const [view, setView] = useState<AppView>('campaign')
+  const [sessionMode, setSessionMode] = useState<SessionMode>('campaign')
   const [soundEnabled, setSoundEnabled] = useState(() => loadPreferences().soundEnabled)
+  const [gameMenuOpen, setGameMenuOpen] = useState(false)
   const [startedAt, setStartedAt] = useState<number | null>(null)
   const [assistUsage, setAssistUsage] = useState<SessionAssistUsage>({
     hintUsed: 0,
     undoUsed: 0,
   })
   const [completionDurationMs, setCompletionDurationMs] = useState<number | null>(null)
+  const [passiveHintTileId, setPassiveHintTileId] = useState<string | null>(null)
   const completionKeyRef = useRef<string | null>(null)
 
   const currentLevel = getCampaignLevelById(selectedLevelId, campaign) ?? fallbackLevel
-  const difficultyLabel = currentLevel.difficulty
-    ? DIFFICULTY_LABELS[currentLevel.difficulty]
-    : null
   const [state, dispatch] = useReducer(
     createGameReducer(currentLevel, config),
     currentLevel,
     (level) => createInitialGameState(level),
   )
+  const previousStatusRef = useRef(state.status)
+  const previousMatchBurstCountRef = useRef(0)
+  const quickPlayLevel = getQuickPlayLevel(campaignLevels, campaignProgress, fallbackLevel)
 
   const unlockedCount = campaignProgress.unlockedLevelIds.length
   const completedCount = campaignProgress.completedLevelIds.length
@@ -968,7 +698,6 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     0,
   )
   const chapterSummaries = getChapterSummaries(campaign, campaignProgress)
-  const chapterCount = chapterSummaries.length
   const completionPercent =
     campaignLevels.length === 0 ? 0 : Math.round((completedCount / campaignLevels.length) * 100)
   const currentLevelRecord = campaignProgress.levelRecords[selectedLevelId]
@@ -981,20 +710,83 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   const selectedChapterSummary =
     chapterSummaries.find((summary) => summary.chapter.id === selectedChapterId) ??
     chapterSummaries[0]
-  const selectedChapterTheme = getChapterAvatarTheme(selectedChapterSummary?.chapter)
+  const selectedChapterTheme = getChapterTheme(selectedChapterSummary?.chapter)
+  const selectedChapterLevels = selectedChapterSummary
+    ? getLevelsForChapter(selectedChapterSummary.chapter.id, campaign)
+    : []
   const chapterSections = chapterSummaries.map((summary) => ({
     summary,
     levels: getLevelsForChapter(summary.chapter.id, campaign),
   }))
   const nextLevel = nextLevelId ? getCampaignLevelById(nextLevelId, campaign) : null
+  const chapterLevelIndex =
+    selectedChapterLevels.findIndex((level) => level.id === currentLevel.id) + 1
   const unlockMessage =
-    state.status === 'won'
+    state.status === 'won' && sessionMode === 'campaign'
       ? nextLevel
         ? nextLevel.campaign?.chapterId !== currentLevel.campaign?.chapterId
           ? `新章节已开启：${nextLevel.campaign?.chapter ?? '下一章节'}`
           : `已解锁下一关：${nextLevel.name}`
-        : '战役通关完成'
-      : null
+        : '整套战役已经打通'
+      : state.status === 'won' && sessionMode === 'quick'
+        ? '快速单局完成'
+        : null
+
+  const activeBoardTiles = getRemainingBoardTiles(state).sort((leftTile, rightTile) => {
+    if (leftTile.layer !== rightTile.layer) {
+      return leftTile.layer - rightTile.layer
+    }
+
+    return leftTile.y - rightTile.y
+  })
+  const blockedTileIds = new Set(
+    activeBoardTiles
+      .filter((tile) => isTileBlocked(tile.id, state, config))
+      .map((tile) => tile.id),
+  )
+  const isResolvingMatch = state.matchBursts.length > 0
+  const remainingCount = activeBoardTiles.length
+  const matchedPairs = Math.floor(state.removedCount / config.matchCount)
+  const currentScore = matchedPairs * 800
+  const levelHudValue =
+    chapterLevelIndex > 0 && selectedChapterSummary
+      ? `${selectedChapterSummary.chapter.order}-${chapterLevelIndex}`
+      : `${currentLevel.campaign?.order ?? 1}`
+  const hintSuggestion = getHintSuggestion(state, config)
+  const canUseHintButton =
+    state.status === 'playing' &&
+    state.assistCharges.hint > 0 &&
+    !isResolvingMatch &&
+    hintSuggestion !== null
+  const canDisplayPassiveHint =
+    view === 'game' &&
+    state.status === 'playing' &&
+    !isResolvingMatch &&
+    state.lastHintTileId === null &&
+    hintSuggestion !== null
+  const displayedHintTileId =
+    state.lastHintTileId ?? (canDisplayPassiveHint ? passiveHintTileId : null)
+  const autoHintActive =
+    canDisplayPassiveHint &&
+    passiveHintTileId !== null &&
+    passiveHintTileId === displayedHintTileId &&
+    state.lastHintTileId === null
+
+  function playSound(kind: UiSoundKind) {
+    if (!soundEnabled) {
+      return
+    }
+
+    playUiSound(kind)
+  }
+
+  const playSoundFromEffect = useEffectEvent((kind: UiSoundKind) => {
+    if (!soundEnabled) {
+      return
+    }
+
+    playUiSound(kind)
+  })
 
   useEffect(() => {
     savePreferences({ soundEnabled })
@@ -1016,16 +808,16 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   }, [])
 
   useEffect(() => {
-    const renderGameToText = () => {
-      const chapterPayload = chapterSummaries.map((summary) => ({
-        id: summary.chapter.id,
-        title: summary.chapter.title,
-        unlockedLevels: summary.unlockedLevels,
-        completedLevels: summary.completedLevels,
-        totalLevels: summary.totalLevels,
-        earnedStars: summary.earnedStars,
-      }))
+    const chapterPayload = chapterSummaries.map((summary) => ({
+      id: summary.chapter.id,
+      title: summary.chapter.title,
+      unlockedLevels: summary.unlockedLevels,
+      completedLevels: summary.completedLevels,
+      totalLevels: summary.totalLevels,
+      earnedStars: summary.earnedStars,
+    }))
 
+    const renderGameToText = () => {
       if (view === 'campaign') {
         return JSON.stringify({
           view,
@@ -1037,6 +829,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
           campaign: {
             id: campaign.id,
             selectedLevelId,
+            sessionMode,
             unlockedCount,
             completedCount,
             totalLevels: campaignLevels.length,
@@ -1061,6 +854,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
         campaign: {
           id: campaign.id,
           selectedLevelId,
+          sessionMode,
           unlockedCount,
           completedCount,
           totalLevels: campaignLevels.length,
@@ -1074,12 +868,15 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
         },
         status: state.status,
         matchCount: config.matchCount,
+        score: currentScore,
+        matchedPairs,
         selectedCount: state.selectedCount,
         removedCount: state.removedCount,
         trayCapacity: config.trayCapacity,
         trayTiles: state.trayTiles.map((trayTile) => trayTile.type),
         assistCharges: state.assistCharges,
         lastHintTileId: state.lastHintTileId,
+        autoHintTileId: passiveHintTileId,
         remainingCount: getRemainingBoardTiles(state).length,
         exposedTiles: getRemainingBoardTiles(state)
           .filter((tile) => !isTileBlocked(tile.id, state, config))
@@ -1089,9 +886,10 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
             x: tile.x,
             y: tile.y,
             layer: tile.layer,
-        })),
+          })),
       })
     }
+
     Reflect.set(window, 'render_game_to_text', renderGameToText)
 
     return () => {
@@ -1106,12 +904,15 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
     currentLevel.difficulty,
     currentLevel.id,
     currentLevel.name,
+    currentScore,
+    matchedPairs,
+    passiveHintTileId,
+    sessionMode,
+    selectedChapterId,
     selectedLevelId,
     state,
-    totalStars,
     unlockedCount,
     view,
-    selectedChapterId,
   ])
 
   useEffect(() => {
@@ -1143,6 +944,61 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   }, [state.lastHintTileId])
 
   useEffect(() => {
+    if (passiveHintTileId === null) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      setPassiveHintTileId((currentHintTileId) =>
+        currentHintTileId === passiveHintTileId ? null : currentHintTileId,
+      )
+    }, AUTO_HINT_FLASH_MS)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [passiveHintTileId])
+
+  useEffect(() => {
+    if (!canDisplayPassiveHint) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      if (hintSuggestion) {
+        setPassiveHintTileId(hintSuggestion.tileId)
+      }
+    }, AUTO_HINT_IDLE_MS)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [
+    canDisplayPassiveHint,
+    hintSuggestion,
+  ])
+
+  useEffect(() => {
+    if (state.matchBursts.length > 0 && previousMatchBurstCountRef.current === 0) {
+      playSoundFromEffect('match')
+    }
+
+    previousMatchBurstCountRef.current = state.matchBursts.length
+  }, [soundEnabled, state.matchBursts.length])
+
+  useEffect(() => {
+    if (previousStatusRef.current !== state.status) {
+      if (state.status === 'won') {
+        playSoundFromEffect('win')
+      } else if (state.status === 'lost') {
+        playSoundFromEffect('lose')
+      }
+    }
+
+    previousStatusRef.current = state.status
+  }, [soundEnabled, state.status])
+
+  useEffect(() => {
     if (state.status !== 'won' || startedAt === null) {
       return
     }
@@ -1159,6 +1015,11 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
 
     startTransition(() => {
       setCompletionDurationMs(durationMs)
+
+      if (sessionMode === 'quick') {
+        return
+      }
+
       setCampaignProgress((currentProgress) =>
         recordLevelCompletion(
           currentProgress,
@@ -1172,50 +1033,34 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
         ),
       )
     })
-  }, [campaign, currentLevel, startedAt, state.levelId, state.selectedCount, state.status])
+  }, [campaign, currentLevel, sessionMode, startedAt, state.levelId, state.selectedCount, state.status])
 
-  const activeBoardTiles = getRemainingBoardTiles(state).sort((leftTile, rightTile) => {
-    if (leftTile.layer !== rightTile.layer) {
-      return leftTile.layer - rightTile.layer
-    }
-
-    return leftTile.y - rightTile.y
-  })
-  const blockedTileIds = new Set(
-    activeBoardTiles
-      .filter((tile) => isTileBlocked(tile.id, state, config))
-      .map((tile) => tile.id),
-  )
-  const isResolvingMatch = state.matchBursts.length > 0
-  const remainingCount = activeBoardTiles.length
-  const hintSuggestion = getHintSuggestion(state, config)
-  const canUseHintButton =
-    state.status === 'playing' &&
-    state.assistCharges.hint > 0 &&
-    !isResolvingMatch &&
-    hintSuggestion !== null
-
-  function startLevel(levelId: string) {
-    const nextLevel = getCampaignLevelById(levelId, campaign)
+  function startLevel(levelId: string, mode: SessionMode = 'campaign') {
+    const nextLevelDefinition = getCampaignLevelById(levelId, campaign)
     const isUnlocked = campaignProgress.levelRecords[levelId]?.unlocked ?? false
 
-    if (!nextLevel || !isUnlocked) {
+    if (!nextLevelDefinition || !isUnlocked) {
       return
     }
 
     completionKeyRef.current = null
     setSelectedLevelId(levelId)
-    setCampaignProgress((currentProgress) =>
-      setCurrentCampaignLevel(currentProgress, campaign, levelId),
-    )
+    if (mode === 'campaign') {
+      setCampaignProgress((currentProgress) =>
+        setCurrentCampaignLevel(currentProgress, campaign, levelId),
+      )
+    }
     setAssistUsage({
       hintUsed: 0,
       undoUsed: 0,
     })
     setCompletionDurationMs(null)
+    setPassiveHintTileId(null)
+    setGameMenuOpen(false)
+    setSessionMode(mode)
     setStartedAt(Date.now())
     setView('game')
-    dispatch({ type: 'start-level', level: nextLevel })
+    dispatch({ type: 'start-level', level: nextLevelDefinition })
   }
 
   function retryCurrentLevel() {
@@ -1225,12 +1070,17 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
       undoUsed: 0,
     })
     setCompletionDurationMs(null)
+    setPassiveHintTileId(null)
+    setGameMenuOpen(false)
     setStartedAt(Date.now())
     dispatch({ type: 'restart' })
   }
 
   function returnToCampaign() {
     completionKeyRef.current = null
+    setPassiveHintTileId(null)
+    setGameMenuOpen(false)
+    setSessionMode('campaign')
     setView('campaign')
     dispatch({ type: 'clear-hint' })
   }
@@ -1244,6 +1094,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
       ...currentUsage,
       hintUsed: currentUsage.hintUsed + 1,
     }))
+    setPassiveHintTileId(null)
+    playSound('hint')
     dispatch({ type: 'use-hint' })
   }
 
@@ -1256,6 +1108,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
       ...currentUsage,
       undoUsed: currentUsage.undoUsed + 1,
     }))
+    setPassiveHintTileId(null)
+    playSound('undo')
     dispatch({ type: 'use-undo' })
   }
 
@@ -1268,9 +1122,17 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
 
     completionKeyRef.current = null
     setCompletionDurationMs(null)
+    setPassiveHintTileId(null)
     setCampaignProgress(nextProgress)
     setSelectedLevelId(nextProgress.currentLevelId)
+    setSessionMode('campaign')
     setView('campaign')
+  }
+
+  function handlePickTile(tileId: string) {
+    playSound('pick')
+    setPassiveHintTileId(null)
+    dispatch({ type: 'pick', tileId })
   }
 
   const currentStars =
@@ -1278,13 +1140,10 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
 
   return (
     <main className="app-shell">
-      <div className="sky-glow sky-glow--left" aria-hidden="true" />
-      <div className="sky-glow sky-glow--right" aria-hidden="true" />
-
-      <section className="phone-frame">
+      <section className={`phone-frame${view === 'game' ? ' phone-frame--game' : ''}`}>
         <header className="topbar">
           <div className="topbar__branding">
-            <p className="eyebrow">{WORLD_SUBTITLE} · H5 章节战役</p>
+            <p className="eyebrow">麻将桌布风格 · 5章20关</p>
             <h1>{GAME_TITLE}</h1>
             <p className="topbar__subtitle">{WORLD_SUBTITLE}</p>
           </div>
@@ -1296,7 +1155,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
               onClick={() => setSoundEnabled((currentValue) => !currentValue)}
               aria-pressed={!soundEnabled}
             >
-              音效 {soundEnabled ? '开' : '关'}
+              温和音效 {soundEnabled ? '开' : '关'}
             </button>
             <button type="button" className="secondary-button" onClick={handleResetProgress}>
               重置进度
@@ -1306,25 +1165,15 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
 
         {view === 'campaign' ? (
           <section className="intro-card" data-testid="campaign-screen">
-            <div
-              className="intro-card__hero"
-              style={getChapterThemeStyle(selectedChapterTheme)}
-            >
-              <img
-                src={selectedChapterTheme.ribbon}
-                alt=""
-                aria-hidden="true"
-                className="hero-ribbon hero-ribbon--main"
-              />
-              <div className="intro-card__hero-copy">
-                <span className="intro-badge">朱天宇定制版</span>
-                <p className="intro-title">{GAME_TITLE}</p>
-                <p className="intro-subtitle">{WORLD_SUBTITLE}</p>
-                <p className="intro-copy">
-                  这是一份为朱天宇打造的专属闯关版本，已经切成 Vita Mahjong 风格的二消玩法，当前包含{' '}
-                  {campaignLevels.length} 关与 {chapterCount} 个章节。沿着角色章节推进、收集星级，并在顶部四格配对槽里稳住节奏。
+            <section className="lobby-hero" style={getChapterThemeStyle(selectedChapterTheme)}>
+              <div className="lobby-hero__copy">
+                <span className="intro-badge">首页与单局共用牌桌外层</span>
+                <h2 className="lobby-hero__title">{GAME_TITLE}</h2>
+                <p className="lobby-hero__subtitle">{WORLD_SUBTITLE}</p>
+                <p className="lobby-hero__text">
+                  这一版把首页、章节和单局统一成深绿桌布与暖白麻将砖的同一套视觉。每章都会按
+                  48 / 60 / 72 / 84 的牌堆密度递进，单局继续保留你现在的二消规则和顶部四格槽。
                 </p>
-
                 <div className="intro-card__meta">
                   <div className="rule-chip" data-testid="unlocked-count">
                     已解锁 {unlockedCount}/{campaignLevels.length}
@@ -1337,34 +1186,27 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 </div>
               </div>
 
-              <div className="hero-portrait">
-                <div className="hero-portrait__frame">
-                  <img
-                    src={selectedChapterTheme.avatar}
-                    alt={`${selectedChapterTheme.roleName}头像`}
-                    className="chapter-avatar chapter-avatar--hero"
-                  />
-                  <img
-                    src={selectedChapterTheme.sticker}
-                    alt=""
-                    aria-hidden="true"
-                    className="hero-portrait__sticker"
-                  />
-                </div>
-                <div className="hero-portrait__card">
-                  <span className="hero-portrait__role">{selectedChapterTheme.roleName}</span>
-                  <span className="hero-portrait__tag">{selectedChapterTheme.roleTag}</span>
+              <div className="lobby-hero__panel">
+                <ChapterSeal chapter={selectedChapterSummary?.chapter} emphasis="large" />
+                <div className="lobby-hero__panel-copy">
+                  <p className="eyebrow">当前主线</p>
+                  <strong>{selectedChapterSummary?.chapter.title ?? WORLD_SUBTITLE}</strong>
+                  <span>
+                    第 {currentLevel.campaign?.order ?? 1} 关 · {currentLevel.name}
+                  </span>
+                  <span>{getRecommendedGoal(currentLevel)}</span>
+                  <span>快速单局会使用：{quickPlayLevel.name}</span>
                 </div>
               </div>
-            </div>
+            </section>
 
             <section className="campaign-progress-panel">
               <div className="campaign-progress-panel__header">
                 <div>
-                  <p className="eyebrow">章节总览</p>
-                  <h2>专属旅程进度</h2>
+                  <p className="eyebrow">战役总览</p>
+                  <h2>章节桌面进度</h2>
                 </div>
-                <p>每一章都有专属角色领路，通关当前章节后，下一章会自动点亮。</p>
+                <p>每章第 4 关都会把桌面铺得更满，单局越往后越接近正式麻将堆叠局面。</p>
               </div>
               <div className="campaign-progress-track" aria-hidden="true">
                 <span
@@ -1375,7 +1217,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
               <div className="campaign-preview">
                 {chapterSummaries.map((summary) => {
                   const isActive = summary.chapter.id === selectedChapterId
-                  const chapterTheme = getChapterAvatarTheme(summary.chapter)
+                  const chapterTheme = getChapterTheme(summary.chapter)
 
                   return (
                     <article
@@ -1386,28 +1228,22 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                       data-testid={`chapter-card-${summary.chapter.id}`}
                       style={getChapterThemeStyle(chapterTheme)}
                     >
-                      <img
-                        src={chapterTheme.ribbon}
-                        alt=""
-                        aria-hidden="true"
-                        className="campaign-preview__ribbon"
-                      />
                       <div className="campaign-preview__topline">
+                        <ChapterSeal chapter={summary.chapter} emphasis="small" />
                         <p className="campaign-preview__badge">
                           第 {summary.chapter.order} 章
                           {summary.chapter.subtitle ? ` · ${summary.chapter.subtitle}` : ''}
                         </p>
-                        <div className="campaign-preview__avatar">
-                          <img
-                            src={chapterTheme.avatar}
-                            alt={`${chapterTheme.roleName}头像`}
-                            className="chapter-avatar chapter-avatar--card"
-                          />
-                        </div>
                       </div>
-                      <span className="campaign-preview__role">{chapterTheme.roleName}</span>
                       <strong>{summary.chapter.title}</strong>
                       <p className="campaign-preview__summary">{summary.chapter.summary}</p>
+                      <div className="chapter-density">
+                        {CHAPTER_TILE_STEPS.map((step) => (
+                          <span key={`${summary.chapter.id}-${step}`} className="chapter-density__chip">
+                            {step}
+                          </span>
+                        ))}
+                      </div>
                       <span className="campaign-preview__stars">
                         {summary.completedLevels}/{summary.totalLevels} 关 · {summary.earnedStars} 星
                       </span>
@@ -1423,12 +1259,6 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 data-testid="chapter-focus"
                 style={getChapterThemeStyle(selectedChapterTheme)}
               >
-                <img
-                  src={selectedChapterTheme.ribbon}
-                  alt=""
-                  aria-hidden="true"
-                  className="chapter-focus__ribbon"
-                />
                 <div className="chapter-focus__intro">
                   <div className="chapter-focus__copy">
                     <span className="intro-badge">
@@ -1439,67 +1269,64 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                       <p>{selectedChapterSummary.chapter.summary}</p>
                     </div>
                   </div>
-                  <div className="chapter-focus__portrait">
-                    <div className="chapter-focus__avatar">
-                      <img
-                        src={selectedChapterTheme.avatar}
-                        alt={`${selectedChapterTheme.roleName}头像`}
-                        className="chapter-avatar chapter-avatar--focus"
-                      />
-                      <img
-                        src={selectedChapterTheme.sticker}
-                        alt=""
-                        aria-hidden="true"
-                        className="chapter-focus__sticker"
-                      />
-                    </div>
-                    <span className="chapter-focus__role">{selectedChapterTheme.roleName}</span>
-                  </div>
+                  <ChapterSeal chapter={selectedChapterSummary.chapter} emphasis="large" />
                 </div>
                 <div className="chapter-focus__meta">
                   <div className="focus-chip">
                     <strong>
                       已解锁 {selectedChapterSummary.unlockedLevels}/{selectedChapterSummary.totalLevels}
                     </strong>
-                    <span>角色收藏进度</span>
+                    <span>当前章节可打关卡</span>
                   </div>
                   <div className="focus-chip">
                     <strong>
                       已完成 {selectedChapterSummary.completedLevels}/{selectedChapterSummary.totalLevels}
                     </strong>
-                    <span>章节通关记录</span>
+                    <span>章节完成进度</span>
                   </div>
                   <div className="focus-chip">
-                    <strong>
-                      奖励 {selectedChapterSummary.chapter.rewardLabel ?? '继续推进战役'}
-                    </strong>
-                    <span>{selectedChapterTheme.roleTag}</span>
+                    <strong>{selectedChapterSummary.chapter.rewardLabel ?? '继续推进战役'}</strong>
+                    <span>{selectedChapterTheme.sealLabel}</span>
                   </div>
+                </div>
+                <div className="chapter-density chapter-density--focus">
+                  {CHAPTER_TILE_STEPS.map((step, index) => (
+                    <span key={`focus-${step}`} className="chapter-density__chip">
+                      第 {index + 1} 关 · {step} 张
+                    </span>
+                  ))}
                 </div>
               </section>
             ) : null}
 
-            <div className="intro-rules">
-              <div className="rule-chip">Vita 风格二消</div>
-              <div className="rule-chip">顺序入槽，相邻才消</div>
-              <div className="rule-chip">提示 / 撤销道具</div>
+              <div className="intro-rules">
+              <div className="rule-chip">暖白麻将砖</div>
+              <div className="rule-chip">深绿桌布</div>
+              <div className="rule-chip">顶部四格槽</div>
+              <div className="rule-chip">动态局内分数</div>
             </div>
 
             <div className="campaign-actions">
               <button
                 type="button"
                 className="primary-button"
-                onClick={() => startLevel(campaignProgress.currentLevelId)}
+                onClick={() => startLevel(campaignProgress.currentLevelId, 'campaign')}
               >
                 继续战役
               </button>
               <button
                 type="button"
                 className="secondary-button"
-                onClick={() => startLevel(selectedLevelId)}
-                disabled={!(campaignProgress.levelRecords[selectedLevelId]?.unlocked ?? false)}
+                onClick={() => startLevel(quickPlayLevel.id, 'quick')}
               >
-                进入当前关卡
+                快速单局
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                disabled
+              >
+                每日挑战 即将开放
               </button>
             </div>
 
@@ -1509,7 +1336,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                   <p className="eyebrow">关卡选择</p>
                   <h2>{WORLD_SUBTITLE}</h2>
                 </div>
-                <p>通关解锁下一关，星级会记录最佳成绩，章节角色会陪你一路推进。</p>
+                <p>前期少牌型、后期多牌型，章节后段会显著更花，但仍然维持稳定可解。</p>
               </div>
 
               <div className="level-select__stack">
@@ -1518,14 +1345,18 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                     key={summary.chapter.id}
                     className="chapter-section"
                     data-testid={`chapter-section-${summary.chapter.id}`}
+                    style={getChapterThemeStyle(getChapterTheme(summary.chapter))}
                   >
                     <div className="chapter-section__header">
-                      <div>
-                        <p className="chapter-section__eyebrow">
-                          第 {summary.chapter.order} 章
-                          {summary.chapter.subtitle ? ` · ${summary.chapter.subtitle}` : ''}
-                        </p>
-                        <h3 className="chapter-section__title">{summary.chapter.title}</h3>
+                      <div className="chapter-section__title-wrap">
+                        <ChapterSeal chapter={summary.chapter} emphasis="small" />
+                        <div>
+                          <p className="chapter-section__eyebrow">
+                            第 {summary.chapter.order} 章
+                            {summary.chapter.subtitle ? ` · ${summary.chapter.subtitle}` : ''}
+                          </p>
+                          <h3 className="chapter-section__title">{summary.chapter.title}</h3>
+                        </div>
                       </div>
                       <div className="chapter-section__meta">
                         <span>{summary.completedLevels}/{summary.totalLevels} 关</span>
@@ -1550,20 +1381,20 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                             data-testid={`level-card-${level.id}`}
                           >
                             <div className="level-card__header">
-                              <span className="intro-badge">
-                                第 {level.campaign?.order} 关
-                              </span>
+                              <span className="intro-badge">第 {level.campaign?.order} 关</span>
                               <div className="level-card__header-tags">
                                 {isCurrent ? <span className="level-card__active-tag">进行中</span> : null}
                                 <span className="level-card__difficulty">
-                                  {level.difficulty ? DIFFICULTY_LABELS[level.difficulty] : '普通'}
+                                  {level.difficulty ? DIFFICULTY_LABELS[level.difficulty] : '标准'}
                                 </span>
                               </div>
                             </div>
                             <p className="level-card__chapter">{summary.chapter.title}</p>
                             <h3 className="level-card__name">{level.name}</h3>
                             <p className="level-card__summary">{level.campaign?.summary}</p>
-                            <p className="level-card__goal">{getRecommendedGoal(level)}</p>
+                            <p className="level-card__goal">
+                              牌堆 {level.tiles.length} 张 · {getRecommendedGoal(level)}
+                            </p>
                             <div className="level-card__meta" data-testid={`level-status-${level.id}`}>
                               <span>{isUnlocked ? '已解锁' : '未解锁'}</span>
                               <span>{getStarText(levelRecord?.stars ?? 0)}</span>
@@ -1575,7 +1406,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                                 data-testid={`start-level-btn-${level.id}`}
                                 onClick={() => {
                                   setSelectedLevelId(level.id)
-                                  startLevel(level.id)
+                                  startLevel(level.id, 'campaign')
                                 }}
                                 disabled={!isUnlocked}
                               >
@@ -1600,66 +1431,71 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
           </section>
         ) : (
           <section className="game-stage" data-testid="game-screen">
-            <div className="campaign-bar" style={getChapterThemeStyle(selectedChapterTheme)}>
-              <div className="campaign-bar__chapter">
-                <div className="campaign-bar__avatar">
-                  <ChapterGameAvatar
-                    chapterId={currentLevel.campaign?.chapterId}
-                    mood="bar"
-                    label={`${selectedChapterTheme.roleName}搞笑头像`}
-                  />
+            <div className="sr-only">
+              <strong data-testid="current-level-id">{currentLevel.id}</strong>
+              <strong data-testid="selected-count">{state.selectedCount} 次</strong>
+              <strong data-testid="remaining-count">{remainingCount} 块</strong>
+            </div>
+
+            <div className="game-hud" style={getChapterThemeStyle(selectedChapterTheme)}>
+              <button
+                type="button"
+                className="game-hud__round-button"
+                aria-label="返回首页"
+                onClick={returnToCampaign}
+              >
+                ←
+              </button>
+
+              <div className="game-hud__stats">
+                <div className="game-hud__stat">
+                  <span>关卡</span>
+                  <strong>{levelHudValue}</strong>
                 </div>
-                <div>
-                  <p className="eyebrow">章节角色</p>
-                  <strong>{currentLevel.campaign?.chapter ?? WORLD_SUBTITLE}</strong>
-                  <span className="campaign-bar__role">{selectedChapterTheme.roleName}</span>
+                <div className="game-hud__stat">
+                  <span>分数</span>
+                  <strong>{currentScore}</strong>
+                </div>
+                <div className="game-hud__stat">
+                  <span>匹配</span>
+                  <strong>{matchedPairs}</strong>
                 </div>
               </div>
-              <div className="campaign-bar__progress">
-                <span>
-                  第 {currentLevel.campaign?.order ?? 1} / {campaignLevels.length} 关
-                </span>
-                <span>{currentLevel.campaign?.chapter}</span>
-                <span>{getStarText(currentLevelRecord?.stars ?? 0)}</span>
+
+              <div className="game-hud__menu-wrap">
+                <button
+                  type="button"
+                  className="game-hud__round-button"
+                  aria-label="单局菜单"
+                  onClick={() => setGameMenuOpen((currentValue) => !currentValue)}
+                >
+                  ☰
+                </button>
+
+                {gameMenuOpen ? (
+                  <div className="game-menu">
+                    <button
+                      type="button"
+                      className="game-menu__button"
+                      aria-label={soundEnabled ? '关闭音效' : '开启音效'}
+                      onClick={() => setSoundEnabled((currentValue) => !currentValue)}
+                    >
+                      {soundEnabled ? '♪' : '♩'}
+                    </button>
+                    <button
+                      type="button"
+                      className="game-menu__button"
+                      aria-label="重新开始"
+                      onClick={retryCurrentLevel}
+                    >
+                      ↺
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
 
-            <div className="status-strip status-strip--compact">
-              <div className="status-chip status-chip--accent">
-                <span className="status-label">关卡</span>
-                <strong data-testid="current-level-id">{currentLevel.id}</strong>
-              </div>
-              {difficultyLabel ? (
-                <div className="status-chip">
-                  <span className="status-label">难度</span>
-                  <strong>{difficultyLabel}</strong>
-                </div>
-              ) : null}
-              <div className="status-chip">
-                <span className="status-label">已点</span>
-                <strong data-testid="selected-count">{state.selectedCount} 次</strong>
-              </div>
-              <div className="status-chip status-chip--warning">
-                <span className="status-label">剩余</span>
-                <strong data-testid="remaining-count">{remainingCount} 块</strong>
-              </div>
-            </div>
-
-            <section className="tray-panel tray-panel--top">
-              <div className="tray-panel__heading">
-                <div>
-                  <p className="eyebrow">顶部配对槽</p>
-                  <h2>
-                    {state.trayTiles.length}/{config.trayCapacity}
-                  </h2>
-                </div>
-                <p className="tray-tip">
-                  {isResolvingMatch
-                    ? '正在结算二消...'
-                    : `只有相邻连在一起的两张头像才会消，最多只留 ${config.trayCapacity} 张`}
-                </p>
-              </div>
-
+            <section className="tray-panel tray-panel--play" aria-label="顶部配对槽">
               <div
                 className="tray-grid"
                 data-testid="tray-grid"
@@ -1676,23 +1512,9 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                         <div
                           className="tray-tile"
                           data-testid={`tray-slot-${slotIndex}`}
-                          style={
-                            {
-                              '--tile-main': TILE_THEMES[trayTile.type].main,
-                              '--tile-accent': TILE_THEMES[trayTile.type].accent,
-                              '--tile-shadow': TILE_THEMES[trayTile.type].shadow,
-                              '--tile-outline': TILE_THEMES[trayTile.type].outline,
-                              '--tile-pattern': TILE_THEMES[trayTile.type].pattern,
-                              '--entry-duration': `${config.animationMs.trayEntry}ms`,
-                            } as CSSProperties
-                          }
+                          style={getTrayStyle(trayTile.type, config)}
                         >
-                          <TileMascot
-                            tileType={trayTile.type}
-                            theme={TILE_THEMES[trayTile.type]}
-                            mood="tray"
-                            compact
-                          />
+                          <CardFace theme={TILE_THEMES[trayTile.type]} mood="tray" compact />
                         </div>
                       ) : (
                         <div className="tray-slot__placeholder" />
@@ -1708,23 +1530,8 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                     style={getBurstStyle(burst.slotIndex)}
                     aria-hidden="true"
                   >
-                    <span
-                      style={
-                        {
-                          '--tile-main': TILE_THEMES[burst.type].main,
-                          '--tile-accent': TILE_THEMES[burst.type].accent,
-                          '--tile-shadow': TILE_THEMES[burst.type].shadow,
-                          '--tile-outline': TILE_THEMES[burst.type].outline,
-                          '--tile-pattern': TILE_THEMES[burst.type].pattern,
-                        } as CSSProperties
-                      }
-                    >
-                      <TileMascot
-                        tileType={burst.type}
-                        theme={TILE_THEMES[burst.type]}
-                        mood="burst"
-                        compact
-                      />
+                    <span style={getTrayStyle(burst.type, config)}>
+                      <CardFace theme={TILE_THEMES[burst.type]} mood="burst" compact />
                     </span>
                   </div>
                 ))}
@@ -1744,17 +1551,16 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 } as CSSProperties
               }
             >
-              <img
-                src={selectedChapterTheme.sticker}
-                alt=""
-                aria-hidden="true"
-                className="board-shell__sticker"
-              />
               <div className="board-surface">
                 {activeBoardTiles.map((tile) => {
                   const theme = TILE_THEMES[tile.type]
                   const blocked = blockedTileIds.has(tile.id)
-                  const hinted = state.lastHintTileId === tile.id
+                  const hinted = displayedHintTileId === tile.id
+                  const visualState: TileMood = blocked
+                    ? 'board-blocked'
+                    : hinted
+                      ? 'board-hinted'
+                      : 'board-active'
 
                   return (
                     <button
@@ -1762,21 +1568,17 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                       type="button"
                       className={`tile-card${blocked ? ' is-blocked' : ''}${
                         hinted ? ' is-hinted' : ''
-                      }`}
+                      }${autoHintActive && hinted ? ' is-passive-hinted' : ''}`}
                       style={getTileStyle(tile)}
-                      onClick={() => dispatch({ type: 'pick', tileId: tile.id })}
+                      onClick={() => handlePickTile(tile.id)}
                       aria-label={theme.title}
                       data-testid={`tile-${tile.id}`}
                       disabled={blocked || isResolvingMatch || state.status !== 'playing'}
                     >
                       <span className="tile-card__shadow" aria-hidden="true" />
                       <span className="tile-card__face">
-                        <span className="tile-card__shine" aria-hidden="true" />
-                        <TileMascot
-                          tileType={tile.type}
-                          theme={theme}
-                          mood={blocked ? 'board-blocked' : hinted ? 'board-hinted' : 'board-active'}
-                        />
+                        <span className="tile-card__frame" aria-hidden="true" />
+                        <CardFace theme={theme} mood={visualState} />
                       </span>
                     </button>
                   )
@@ -1784,49 +1586,29 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
               </div>
             </div>
 
-            <section className="toolbelt">
-              <div className="toolbelt__header">
-                <div>
-                  <p className="eyebrow">局内辅助</p>
-                  <h2>四槽节奏</h2>
-                </div>
-                <p className="toolbelt__tip">
-                  {state.lastHintTileId
-                    ? '提示已圈出一张更适合现在凑对的头像。'
-                    : '提示只会高亮推荐头像，不会替你自动点击。'}
-                </p>
-              </div>
-
-              <div className="toolbelt__actions">
+            <section className="toolbelt toolbelt--play">
+              <div className="toolbelt__actions toolbelt__actions--play">
                 <button
                   type="button"
                   className="tool-button tool-button--hint"
                   data-testid="hint-button"
+                  aria-label="提示"
                   disabled={!canUseHintButton}
                   onClick={handleUseHint}
                 >
-                  <span className="tool-button__icon">灯</span>
-                  <span className="tool-button__label">提示</span>
+                  <span className="tool-button__icon">✦</span>
                   <span className="tool-button__count">{state.assistCharges.hint}</span>
                 </button>
                 <button
                   type="button"
                   className="tool-button tool-button--undo"
                   data-testid="undo-button"
+                  aria-label="撤销"
                   disabled={!canUseUndo(state)}
                   onClick={handleUseUndo}
                 >
-                  <span className="tool-button__icon">回</span>
-                  <span className="tool-button__label">撤销</span>
+                  <span className="tool-button__icon">↺</span>
                   <span className="tool-button__count">{state.assistCharges.undo}</span>
-                </button>
-                <button
-                  type="button"
-                  className="tool-button tool-button--map"
-                  onClick={returnToCampaign}
-                >
-                  <span className="tool-button__icon">图</span>
-                  <span className="tool-button__label">回到花园地图</span>
                 </button>
               </div>
             </section>
@@ -1840,32 +1622,27 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
               data-testid="result-modal"
               style={getChapterThemeStyle(selectedChapterTheme)}
             >
-              <img
-                src={selectedChapterTheme.ribbon}
-                alt=""
-                aria-hidden="true"
-                className="result-modal__ribbon"
-              />
               <div className="result-modal__hero">
-                <div className="result-modal__avatar-shell">
-                  <ChapterGameAvatar
-                    chapterId={currentLevel.campaign?.chapterId}
-                    mood={state.status === 'won' ? 'win' : 'loss'}
-                    label={`${selectedChapterTheme.roleName}${state.status === 'won' ? '庆祝头像' : '崩溃头像'}`}
-                  />
-                  <img
-                    src={selectedChapterTheme.sticker}
-                    alt=""
-                    aria-hidden="true"
-                    className="result-modal__sticker"
-                  />
-                </div>
+                <ChapterSeal chapter={selectedChapterSummary?.chapter} emphasis="large" />
                 <div className="result-modal__heading">
                   <p className="eyebrow">{state.status === 'won' ? '通关结算' : '本关失败'}</p>
-                  <h2>{state.status === 'won' ? '本局二消完成' : '顶部配对槽卡住了'}</h2>
-                  <p className="result-modal__role">{selectedChapterTheme.roleName} 正在陪你冲刺下一站</p>
+                  <h2>
+                    {state.status === 'won'
+                      ? sessionMode === 'quick'
+                        ? '快速单局完成'
+                        : '本局清空完成'
+                      : '顶部配对槽卡住了'}
+                  </h2>
+                  <p className="result-modal__role">
+                    {state.status === 'won'
+                      ? sessionMode === 'quick'
+                        ? '这局不写入主线，只帮你练节奏和看牌。'
+                        : '新的牌面已经被揭露出来，下一关会更复杂一点。'
+                      : '这一局没有惩罚，整理一下顺序就能马上再试。'}
+                  </p>
                 </div>
               </div>
+
               {state.status === 'won' ? (
                 <>
                   {unlockMessage ? (
@@ -1873,18 +1650,22 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                   ) : null}
                   <div className="result-modal__stars">{getStarText(currentStars)}</div>
                   <div className="result-modal__reward">
-                    <span>本章累计 {selectedChapterSummary?.earnedStars ?? 0} 星</span>
+                    <span>本局分数 {currentScore}</span>
                     <span>
-                      最佳次数 {currentLevelRecord?.bestSelectedCount ?? state.selectedCount}
+                      {sessionMode === 'quick'
+                        ? '本局不改变战役存档'
+                        : `本章累计 ${selectedChapterSummary?.earnedStars ?? 0} 星`}
                     </span>
+                    <span>最佳次数 {currentLevelRecord?.bestSelectedCount ?? state.selectedCount}</span>
                   </div>
                   <div className="result-modal__summary">
+                    <span>匹配 {matchedPairs} 对</span>
                     <span>点击 {state.selectedCount} 次</span>
                     <span>用时 {formatDuration(completionDurationMs)}</span>
                     <span>提示 {assistUsage.hintUsed} 次</span>
                     <span>撤销 {assistUsage.undoUsed} 次</span>
                   </div>
-                  {nextLevel ? (
+                  {nextLevel && sessionMode === 'campaign' ? (
                     <div className="result-modal__next">
                       下一站：{nextLevel.campaign?.chapter ?? '下一章节'} · {nextLevel.name}
                     </div>
@@ -1893,19 +1674,19 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
               ) : (
                 <p>
                   你还剩 {state.assistCharges.undo} 次撤销、{state.assistCharges.hint} 次提示，
-                  可以继续重试，也可以回到地图换一关。
+                  可以继续重试，也可以回到首页换一关。
                 </p>
               )}
 
               <div className="result-modal__actions">
-                {state.status === 'won' && nextLevelId && nextLevelUnlocked ? (
+                {state.status === 'won' && sessionMode === 'campaign' && nextLevelId && nextLevelUnlocked ? (
                   <button
                     type="button"
                     className="primary-button primary-button--next"
                     data-testid="next-level-button"
-                    onClick={() => startLevel(nextLevelId)}
+                    onClick={() => startLevel(nextLevelId, 'campaign')}
                   >
-                    前往下一片花圃
+                    前往下一关
                   </button>
                 ) : null}
                 <button
@@ -1922,7 +1703,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                   data-testid="back-to-campaign-button"
                   onClick={returnToCampaign}
                 >
-                  回到花园地图
+                  返回首页
                 </button>
               </div>
             </div>

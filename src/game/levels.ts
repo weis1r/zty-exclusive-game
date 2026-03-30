@@ -18,6 +18,7 @@ interface LevelLayoutDefinition {
   boardWidth: number
   boardHeight: number
   openingCount: number
+  tileCount: number
 }
 
 interface ChapterBlueprint {
@@ -30,7 +31,7 @@ interface ChapterBlueprint {
   accentColor?: string
 }
 
-type LevelLayoutId = 'stack144'
+type LevelLayoutId = 'stack48' | 'stack60' | 'stack72' | 'stack84'
 type TileCountSpec = readonly [TileType, number]
 type FillerPatternId = 'paired' | 'echo' | 'braid' | 'cross' | 'orbit'
 
@@ -49,6 +50,33 @@ interface LevelBlueprint {
   countProfile: readonly number[]
   opening: TileType[]
   fillerPattern: FillerPatternId
+}
+
+interface LevelBlueprintInput {
+  id: string
+  name: string
+  layout: LevelLayoutId
+  difficulty: NonNullable<LevelDefinition['difficulty']>
+  chapterId: string
+  order: number
+  summary: string
+  chapterPool: TileType[]
+  varietyCount: number
+  fillerPattern: FillerPatternId
+  favoredIndex?: number
+}
+
+const BOARD_WIDTH = 344
+const BOARD_HEIGHT = 568
+const TILE_WIDTH = 70
+const STEP_X = 54
+const STEP_Y = 58
+const LAYER_SHIFT_Y = 18
+const LAYER_SHIFT_X: Record<number, number> = {
+  0: 0,
+  1: 10,
+  2: -8,
+  3: 14,
 }
 
 function createTiles(slots: TileSlot[], types: TileType[]): TileDefinition[] {
@@ -71,23 +99,6 @@ function createTiles(slots: TileSlot[], types: TileType[]): TileDefinition[] {
       layer: slot.layer,
     }
   })
-}
-
-function repeatSlots(baseSlots: TileSlot[], copies: number, layerStride: number): TileSlot[] {
-  const slots: TileSlot[] = []
-
-  for (let copyIndex = copies - 1; copyIndex >= 0; copyIndex -= 1) {
-    const layerOffset = copyIndex * layerStride
-
-    baseSlots.forEach((slot) => {
-      slots.push({
-        ...slot,
-        layer: slot.layer + layerOffset,
-      })
-    })
-  }
-
-  return slots
 }
 
 function buildCounts(typePool: TileType[], countProfile: readonly number[]): TileCountSpec[] {
@@ -150,6 +161,7 @@ function buildLevelTypes(
 
   const remainingCounts = new Map<TileType, number>(counts)
   const types: TileType[] = []
+  const fillerOrder = [...new Set(filler)]
 
   opening.forEach((type) => {
     const remaining = remainingCounts.get(type) ?? 0
@@ -163,15 +175,15 @@ function buildLevelTypes(
   })
 
   let cursor = 0
-  const guardLimit = layout.slots.length * filler.length * 24
+  const guardLimit = layout.slots.length * Math.max(fillerOrder.length, 1) * 24
 
   while (types.length < layout.slots.length) {
-    const type = filler[cursor % filler.length]
+    const type = fillerOrder[cursor % fillerOrder.length]
     const remaining = remainingCounts.get(type) ?? 0
 
-    if (remaining > 0) {
-      remainingCounts.set(type, remaining - 1)
-      types.push(type)
+    if (remaining >= 2) {
+      remainingCounts.set(type, remaining - 2)
+      types.push(type, type)
     }
 
     cursor += 1
@@ -184,60 +196,178 @@ function buildLevelTypes(
   const unusedTypes = [...remainingCounts.entries()].filter(([, remaining]) => remaining !== 0)
 
   if (unusedTypes.length > 0) {
-    throw new Error(`Unused tile counts remain: ${unusedTypes.map(([type, count]) => `${type}:${count}`).join(', ')}`)
+    throw new Error(
+      `Unused tile counts remain: ${unusedTypes.map(([type, count]) => `${type}:${count}`).join(', ')}`,
+    )
   }
 
   return types
 }
 
-const STACK_36_SLOTS: TileSlot[] = [
-  { x: 134, y: 30, layer: 3 },
-  { x: 210, y: 30, layer: 3 },
-  { x: 134, y: 124, layer: 3 },
-  { x: 210, y: 124, layer: 3 },
-  { x: 134, y: 218, layer: 3 },
-  { x: 210, y: 218, layer: 3 },
-  { x: 106, y: 68, layer: 2 },
-  { x: 182, y: 68, layer: 2 },
-  { x: 258, y: 68, layer: 2 },
-  { x: 106, y: 162, layer: 2 },
-  { x: 182, y: 162, layer: 2 },
-  { x: 258, y: 162, layer: 2 },
-  { x: 106, y: 256, layer: 2 },
-  { x: 182, y: 256, layer: 2 },
-  { x: 258, y: 256, layer: 2 },
-  { x: 78, y: 106, layer: 1 },
-  { x: 154, y: 106, layer: 1 },
-  { x: 230, y: 106, layer: 1 },
-  { x: 78, y: 200, layer: 1 },
-  { x: 154, y: 200, layer: 1 },
-  { x: 230, y: 200, layer: 1 },
-  { x: 78, y: 294, layer: 1 },
-  { x: 154, y: 294, layer: 1 },
-  { x: 230, y: 294, layer: 1 },
-  { x: 50, y: 144, layer: 0 },
-  { x: 126, y: 144, layer: 0 },
-  { x: 202, y: 144, layer: 0 },
-  { x: 278, y: 144, layer: 0 },
-  { x: 50, y: 238, layer: 0 },
-  { x: 126, y: 238, layer: 0 },
-  { x: 202, y: 238, layer: 0 },
-  { x: 278, y: 238, layer: 0 },
-  { x: 50, y: 332, layer: 0 },
-  { x: 126, y: 332, layer: 0 },
-  { x: 202, y: 332, layer: 0 },
-  { x: 278, y: 332, layer: 0 },
-]
+function createCenteredRowSlots(count: number, y: number, layer: number, shiftX = 0): TileSlot[] {
+  const rowWidth = TILE_WIDTH + STEP_X * (count - 1)
+  const startX = Math.round((BOARD_WIDTH - rowWidth) / 2 + shiftX)
 
-const STACK_144_SLOTS: TileSlot[] = repeatSlots(STACK_36_SLOTS, 4, 4)
+  return Array.from({ length: count }, (_, index) => ({
+    x: startX + index * STEP_X,
+    y,
+    layer,
+  }))
+}
+
+function buildLayoutSlots(rowCountsByLayer: Record<number, number[]>, startY: number): TileSlot[] {
+  const slots: TileSlot[] = []
+
+  for (let layer = 3; layer >= 0; layer -= 1) {
+    const rowCounts = rowCountsByLayer[layer] ?? []
+
+    rowCounts.forEach((count, rowIndex) => {
+      const shiftX = LAYER_SHIFT_X[layer] + (rowIndex % 2 === 0 ? 0 : 6)
+      const y = startY + rowIndex * STEP_Y - layer * LAYER_SHIFT_Y
+
+      slots.push(...createCenteredRowSlots(count, y, layer, shiftX))
+    })
+  }
+
+  return slots
+}
 
 const LEVEL_LAYOUTS: Record<LevelLayoutId, LevelLayoutDefinition> = {
-  stack144: {
-    slots: STACK_144_SLOTS,
-    boardWidth: 360,
-    boardHeight: 520,
+  stack48: {
+    slots: buildLayoutSlots(
+      {
+        3: [3, 3],
+        2: [3, 4, 3],
+        1: [4, 3, 4, 3],
+        0: [4, 5, 5, 4],
+      },
+      248,
+    ),
+    boardWidth: BOARD_WIDTH,
+    boardHeight: BOARD_HEIGHT,
     openingCount: 6,
+    tileCount: 48,
   },
+  stack60: {
+    slots: buildLayoutSlots(
+      {
+        3: [3, 3],
+        2: [4, 4, 4],
+        1: [4, 5, 4, 5],
+        0: [5, 4, 5, 5, 5],
+      },
+      220,
+    ),
+    boardWidth: BOARD_WIDTH,
+    boardHeight: BOARD_HEIGHT,
+    openingCount: 6,
+    tileCount: 60,
+  },
+  stack72: {
+    slots: buildLayoutSlots(
+      {
+        3: [4, 4],
+        2: [4, 4, 4, 4],
+        1: [5, 5, 5, 5],
+        0: [5, 5, 6, 6, 6],
+      },
+      198,
+    ),
+    boardWidth: BOARD_WIDTH,
+    boardHeight: BOARD_HEIGHT,
+    openingCount: 8,
+    tileCount: 72,
+  },
+  stack84: {
+    slots: buildLayoutSlots(
+      {
+        3: [5, 5],
+        2: [4, 5, 4, 5],
+        1: [6, 6, 6, 6],
+        0: [6, 5, 5, 5, 5, 6],
+      },
+      188,
+    ),
+    boardWidth: BOARD_WIDTH,
+    boardHeight: BOARD_HEIGHT,
+    openingCount: 10,
+    tileCount: 84,
+  },
+}
+
+function buildCountProfile(totalTiles: number, typePool: TileType[], favoredIndex = 0): readonly number[] {
+  const baseCount = Math.floor(totalTiles / typePool.length / 2) * 2
+  const counts = Array.from({ length: typePool.length }, () => baseCount)
+  let remainder = totalTiles - baseCount * typePool.length
+  let cursor = 0
+
+  while (remainder > 0) {
+    counts[(favoredIndex + cursor) % typePool.length] += 2
+    remainder -= 2
+    cursor += 1
+  }
+
+  return counts
+}
+
+function buildOpening(typePool: TileType[], openingCount: number): TileType[] {
+  const openingTypes = typePool.slice(0, Math.max(1, Math.floor(openingCount / 2)))
+
+  return openingTypes.flatMap((type) => [type, type]).slice(0, openingCount)
+}
+
+function getAssistCurve(order: number): AssistCharges {
+  if (order <= 8) {
+    return { undo: 2, hint: 2 }
+  }
+
+  if (order <= 16) {
+    return { undo: 2, hint: 1 }
+  }
+
+  return { undo: 1, hint: 1 }
+}
+
+function getStarThresholds(tileCount: number, order: number): [number, number, number] {
+  if (order <= 8) {
+    return [tileCount, tileCount + 6, tileCount + 12]
+  }
+
+  if (order <= 16) {
+    return [tileCount, tileCount + 8, tileCount + 16]
+  }
+
+  return [tileCount, tileCount + 10, tileCount + 18]
+}
+
+function createLevelBlueprint(input: LevelBlueprintInput): LevelBlueprint {
+  const layout = LEVEL_LAYOUTS[input.layout]
+  const typePool = input.chapterPool.slice(0, input.varietyCount)
+
+  return {
+    id: input.id,
+    name: input.name,
+    layout: input.layout,
+    difficulty: input.difficulty,
+    chapterId: input.chapterId,
+    order: input.order,
+    summary: input.summary,
+    recommendedSelectionCount: layout.tileCount,
+    starSelectionThresholds: getStarThresholds(layout.tileCount, input.order),
+    startingAssists: getAssistCurve(input.order),
+    typePool,
+    countProfile: buildCountProfile(layout.tileCount, typePool, input.favoredIndex ?? 0),
+    opening: buildOpening(typePool, layout.openingCount),
+    fillerPattern: input.fillerPattern,
+  }
+}
+
+const CHAPTER_POOLS: Record<string, TileType[]> = {
+  'chapter-bloom-path': ['ember', 'leaf', 'bloom', 'bell', 'cloud', 'shell'],
+  'chapter-mirror-court': ['bloom', 'bell', 'cloud', 'shell', 'berry', 'pine', 'wave'],
+  'chapter-sunset-orchard': ['cloud', 'shell', 'berry', 'pine', 'wave', 'spire', 'crown', 'mask'],
+  'chapter-verdant-lab': ['berry', 'pine', 'wave', 'spire', 'crown', 'mask', 'plume', 'lantern', 'dagger'],
+  'chapter-starlit-canopy': ['wave', 'spire', 'crown', 'mask', 'plume', 'lantern', 'dagger', 'harp', 'rose', 'comet', 'key', 'pearl'],
 }
 
 const CHAPTER_BLUEPRINTS: ChapterBlueprint[] = [
@@ -245,370 +375,309 @@ const CHAPTER_BLUEPRINTS: ChapterBlueprint[] = [
     id: 'chapter-bloom-path',
     order: 1,
     title: '晨露花径',
-    subtitle: '热身三关',
-    summary: '前 3 关先让你熟悉“只消相邻对”的节奏，顶部四格槽必须按顺序经营。',
-    rewardLabel: '露珠徽章',
-    accentColor: '#f0b165',
+    subtitle: '热身四关',
+    summary: '先用 48 到 84 张的四步节奏带你熟悉可动牌、顶部四格槽和成对经营。',
+    rewardLabel: '晨露木徽',
+    accentColor: '#e5b36b',
   },
   {
     id: 'chapter-mirror-court',
     order: 2,
     title: '镜庭深处',
-    subtitle: '转折三关',
-    summary: '从这里开始，能看到的对子会变少，ABAC 这种断开的同类不会自动帮你收掉。',
-    rewardLabel: '镜庭纹章',
-    accentColor: '#8db6f0',
+    subtitle: '镜面四关',
+    summary: '这一章开始增加圈牌和条牌，要求你开始为后手连续对提前留口。',
+    rewardLabel: '镜庭牌穗',
+    accentColor: '#96b8d8',
   },
   {
     id: 'chapter-sunset-orchard',
     order: 3,
     title: '晚照果园',
-    subtitle: '变奏四关',
-    summary: '这一章会把更多头像类型塞进 144 张物品里，要求你会提前为连续对腾位置。',
-    rewardLabel: '落霞果徽',
-    accentColor: '#ff9c62',
+    subtitle: '渐满四关',
+    summary: '局面会明显更满，更多花色会同时露在第一眼里，但仍保留稳定起手对。',
+    rewardLabel: '果园铜章',
+    accentColor: '#df915f',
   },
   {
     id: 'chapter-verdant-lab',
     order: 4,
     title: '翠影工房',
-    subtitle: '压阵五关',
-    summary: '中后段开始把假对子和打断对混合出现，想过关就得控槽、记层、记顺序。',
-    rewardLabel: '工房调色盘',
-    accentColor: '#58c99b',
+    subtitle: '压阵四关',
+    summary: '从这章开始要更认真经营顶部卡槽，连续错放单张会更容易把节奏拖死。',
+    rewardLabel: '工房刻牌',
+    accentColor: '#5aa37e',
   },
   {
     id: 'chapter-starlit-canopy',
     order: 5,
     title: '星幕秘苑',
-    subtitle: '终章五关',
-    summary: '终章把 9 类头像全部带回场，最后几关会明显更花，但仍然保留稳定解法。',
-    rewardLabel: '星幕冠饰',
-    accentColor: '#8f92ff',
+    subtitle: '终章四关',
+    summary: '终章会把更多图案混进同一套桌布里，84 张终局需要更稳的读层和记忆。',
+    rewardLabel: '星幕牌印',
+    accentColor: '#8d91c8',
   },
 ]
 
 const LEVEL_BLUEPRINTS: LevelBlueprint[] = [
-  {
+  createLevelBlueprint({
     id: 'thorn-garden-01',
     name: '荆棘迷圃',
-    layout: 'stack144',
+    layout: 'stack48',
     difficulty: 'easy',
     chapterId: 'chapter-bloom-path',
     order: 1,
-    summary: '开局直接给三组安全连续对，先习惯 144 张大盘面和四格顶部槽。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 150, 156],
-    startingAssists: { undo: 2, hint: 2 },
-    typePool: ['ember', 'leaf', 'bloom', 'bell'],
-    countProfile: [36, 36, 36, 36],
-    opening: ['ember', 'ember', 'leaf', 'leaf', 'bloom', 'bloom'],
+    summary: '48 张热身盘，先熟悉犬、猫、鱼、龙四种基础牌面和连续二消节奏。',
+    chapterPool: CHAPTER_POOLS['chapter-bloom-path'],
+    varietyCount: 4,
     fillerPattern: 'paired',
-  },
-  {
+  }),
+  createLevelBlueprint({
     id: 'lantern-steps-02',
     name: '灯影台阶',
-    layout: 'stack144',
+    layout: 'stack60',
     difficulty: 'easy',
     chapterId: 'chapter-bloom-path',
     order: 2,
-    summary: '仍然是 4 类头像，但会先给两对安全对子再混一张干扰牌。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 152, 160],
-    startingAssists: { undo: 2, hint: 2 },
-    typePool: ['ember', 'leaf', 'bloom', 'bell'],
-    countProfile: [40, 36, 34, 34],
-    opening: ['ember', 'ember', 'leaf', 'leaf', 'bloom', 'bell'],
+    summary: '60 张开始把云牌带进来，要求你在更密一点的层次里找安全对子。',
+    chapterPool: CHAPTER_POOLS['chapter-bloom-path'],
+    varietyCount: 5,
     fillerPattern: 'echo',
-  },
-  {
+    favoredIndex: 1,
+  }),
+  createLevelBlueprint({
     id: 'ivy-arcade-03',
     name: '常青回廊',
-    layout: 'stack144',
-    difficulty: 'normal',
+    layout: 'stack72',
+    difficulty: 'easy',
     chapterId: 'chapter-bloom-path',
     order: 3,
-    summary: '章节收尾关加入第 5 类头像，开局只给一对明显对子，开始要求你选顺序。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 154, 162],
-    startingAssists: { undo: 2, hint: 2 },
-    typePool: ['ember', 'leaf', 'bloom', 'bell', 'cloud'],
-    countProfile: [32, 30, 30, 28, 24],
-    opening: ['ember', 'leaf', 'ember', 'bloom', 'bell', 'cloud'],
-    fillerPattern: 'echo',
-  },
-  {
-    id: 'mirror-court-04',
-    name: '镜庭重楼',
-    layout: 'stack144',
-    difficulty: 'normal',
-    chapterId: 'chapter-mirror-court',
+    summary: '72 张盘面第一次接近满铺，猴牌加入后需要更注意槽尾顺序。',
+    chapterPool: CHAPTER_POOLS['chapter-bloom-path'],
+    varietyCount: 6,
+    fillerPattern: 'braid',
+    favoredIndex: 2,
+  }),
+  createLevelBlueprint({
+    id: 'dew-stair-04',
+    name: '晨露阶厅',
+    layout: 'stack84',
+    difficulty: 'easy',
+    chapterId: 'chapter-bloom-path',
     order: 4,
-    summary: '新章节先给你一对稳的，再把剩下 4 张开局位全换成不同头像。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 154, 164],
-    startingAssists: { undo: 2, hint: 2 },
-    typePool: ['leaf', 'bloom', 'bell', 'cloud', 'shell'],
-    countProfile: [30, 30, 28, 28, 28],
-    opening: ['leaf', 'leaf', 'bloom', 'bell', 'cloud', 'shell'],
-    fillerPattern: 'paired',
-  },
-  {
-    id: 'moon-pond-05',
-    name: '月池回声',
-    layout: 'stack144',
+    summary: '本章最满的一盘 84 张，虽然图案只到 6 类，但层次已经像正式棋盘了。',
+    chapterPool: CHAPTER_POOLS['chapter-bloom-path'],
+    varietyCount: 6,
+    fillerPattern: 'cross',
+    favoredIndex: 3,
+  }),
+  createLevelBlueprint({
+    id: 'mirror-court-05',
+    name: '镜庭重楼',
+    layout: 'stack48',
     difficulty: 'normal',
     chapterId: 'chapter-mirror-court',
     order: 5,
-    summary: '相邻对开始藏在不同颜色之间，需要你先为第二张留出落点。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 156, 166],
-    startingAssists: { undo: 2, hint: 1 },
-    typePool: ['leaf', 'bloom', 'bell', 'cloud', 'shell'],
-    countProfile: [32, 30, 30, 28, 24],
-    opening: ['leaf', 'bloom', 'cloud', 'leaf', 'bell', 'shell'],
-    fillerPattern: 'braid',
-  },
-  {
-    id: 'crown-greenhouse-06',
-    name: '冠冕温室',
-    layout: 'stack144',
-    difficulty: 'hard',
+    summary: '第二章用新的圈牌起手，48 张短盘先让你适应更冷静的一组花色。',
+    chapterPool: CHAPTER_POOLS['chapter-mirror-court'],
+    varietyCount: 5,
+    fillerPattern: 'paired',
+    favoredIndex: 1,
+  }),
+  createLevelBlueprint({
+    id: 'moon-pond-06',
+    name: '月池回声',
+    layout: 'stack60',
+    difficulty: 'normal',
     chapterId: 'chapter-mirror-court',
     order: 6,
-    summary: '第二章终局抬到 6 类头像，打断对会明显变多，ABAC 的误判从这里开始惩罚人。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 158, 168],
-    startingAssists: { undo: 2, hint: 1 },
-    typePool: ['ember', 'leaf', 'bloom', 'cloud', 'shell', 'berry'],
-    countProfile: [30, 26, 24, 22, 22, 20],
-    opening: ['ember', 'leaf', 'bloom', 'cloud', 'ember', 'shell'],
+    summary: '60 张盘面把五环带进来，能看见的对子变多，但错手也更容易断节奏。',
+    chapterPool: CHAPTER_POOLS['chapter-mirror-court'],
+    varietyCount: 6,
+    fillerPattern: 'braid',
+    favoredIndex: 2,
+  }),
+  createLevelBlueprint({
+    id: 'silver-river-07',
+    name: '银流长道',
+    layout: 'stack72',
+    difficulty: 'normal',
+    chapterId: 'chapter-mirror-court',
+    order: 7,
+    summary: '72 张盘面继续升密度，七类图案会开始让第一眼判断更花。',
+    chapterPool: CHAPTER_POOLS['chapter-mirror-court'],
+    varietyCount: 6,
     fillerPattern: 'cross',
-  },
-  {
-    id: 'sunset-orchard-07',
+    favoredIndex: 3,
+  }),
+  createLevelBlueprint({
+    id: 'glass-canopy-08',
+    name: '玻璃穹顶',
+    layout: 'stack84',
+    difficulty: 'normal',
+    chapterId: 'chapter-mirror-court',
+    order: 8,
+    summary: '84 张收官盘把本章的 7 类牌全部铺进来，考验你在满铺下找连续对。',
+    chapterPool: CHAPTER_POOLS['chapter-mirror-court'],
+    varietyCount: 7,
+    fillerPattern: 'orbit',
+    favoredIndex: 4,
+  }),
+  createLevelBlueprint({
+    id: 'sunset-orchard-09',
     name: '晚照果园',
-    layout: 'stack144',
+    layout: 'stack48',
     difficulty: 'normal',
     chapterId: 'chapter-sunset-orchard',
-    order: 7,
-    summary: '第三章开场先把盘面做厚，但仍保留一对稳入口，帮助你重新找节奏。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 156, 168],
-    startingAssists: { undo: 2, hint: 1 },
-    typePool: ['leaf', 'bloom', 'bell', 'cloud', 'shell', 'berry'],
-    countProfile: [28, 24, 24, 24, 22, 22],
-    opening: ['leaf', 'leaf', 'bloom', 'cloud', 'shell', 'berry'],
-    fillerPattern: 'paired',
-  },
-  {
-    id: 'petal-carousel-08',
-    name: '花瓣回旋',
-    layout: 'stack144',
-    difficulty: 'hard',
-    chapterId: 'chapter-sunset-orchard',
-    order: 8,
-    summary: '这关会频繁逼你先塞单张，再拼出后手连续对。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 158, 170],
-    startingAssists: { undo: 2, hint: 1 },
-    typePool: ['leaf', 'bloom', 'bell', 'cloud', 'shell', 'berry'],
-    countProfile: [26, 24, 24, 24, 24, 22],
-    opening: ['leaf', 'bloom', 'cloud', 'berry', 'leaf', 'shell'],
-    fillerPattern: 'orbit',
-  },
-  {
-    id: 'prism-walk-09',
-    name: '棱镜步道',
-    layout: 'stack144',
-    difficulty: 'hard',
-    chapterId: 'chapter-sunset-orchard',
     order: 9,
-    summary: '加入第 7 类头像后，开局可见类型更花，留错一个槽位就会断节奏。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 160, 172],
-    startingAssists: { undo: 1, hint: 1 },
-    typePool: ['ember', 'leaf', 'bloom', 'bell', 'cloud', 'shell', 'berry'],
-    countProfile: [24, 22, 20, 20, 20, 20, 18],
-    opening: ['ember', 'leaf', 'bloom', 'cloud', 'ember', 'berry'],
-    fillerPattern: 'braid',
-  },
-  {
-    id: 'glass-canopy-10',
-    name: '玻璃穹顶',
-    layout: 'stack144',
-    difficulty: 'hard',
+    summary: '第三章从 48 张重新起步，但花色密度和视觉复杂度都比前两章更高。',
+    chapterPool: CHAPTER_POOLS['chapter-sunset-orchard'],
+    varietyCount: 6,
+    fillerPattern: 'echo',
+    favoredIndex: 2,
+  }),
+  createLevelBlueprint({
+    id: 'petal-carousel-10',
+    name: '花瓣回旋',
+    layout: 'stack60',
+    difficulty: 'normal',
     chapterId: 'chapter-sunset-orchard',
     order: 10,
-    summary: '章节收官关让 7 类头像同时轮转，最后两段会明显比前两关更碎。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 160, 174],
-    startingAssists: { undo: 1, hint: 1 },
-    typePool: ['ember', 'leaf', 'bloom', 'bell', 'cloud', 'shell', 'berry'],
-    countProfile: [22, 22, 20, 20, 20, 20, 20],
-    opening: ['leaf', 'bloom', 'bell', 'cloud', 'berry', 'leaf'],
-    fillerPattern: 'cross',
-  },
-  {
-    id: 'amber-terrace-11',
-    name: '琥珀阶庭',
-    layout: 'stack144',
-    difficulty: 'hard',
-    chapterId: 'chapter-verdant-lab',
-    order: 11,
-    summary: '第四章开始把“记住槽尾是谁”这件事放到核心位置。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 162, 176],
-    startingAssists: { undo: 1, hint: 1 },
-    typePool: ['leaf', 'bloom', 'bell', 'cloud', 'shell', 'berry', 'pine'],
-    countProfile: [24, 22, 20, 20, 20, 20, 18],
-    opening: ['leaf', 'leaf', 'bloom', 'cloud', 'berry', 'pine'],
-    fillerPattern: 'paired',
-  },
-  {
-    id: 'fern-fairway-12',
-    name: '蕨影长道',
-    layout: 'stack144',
-    difficulty: 'hard',
-    chapterId: 'chapter-verdant-lab',
-    order: 12,
-    summary: '这一关会不断让你在连续对和开层之间做取舍。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 164, 178],
-    startingAssists: { undo: 1, hint: 1 },
-    typePool: ['leaf', 'bloom', 'bell', 'cloud', 'shell', 'berry', 'pine'],
-    countProfile: [22, 22, 20, 20, 20, 20, 20],
-    opening: ['bloom', 'cloud', 'bell', 'berry', 'bloom', 'pine'],
+    summary: '60 张盘面开始加入字牌，前手看似安全的对子更常只是中转站。',
+    chapterPool: CHAPTER_POOLS['chapter-sunset-orchard'],
+    varietyCount: 7,
     fillerPattern: 'braid',
-  },
-  {
-    id: 'mist-vault-13',
-    name: '迷雾花库',
-    layout: 'stack144',
+    favoredIndex: 3,
+  }),
+  createLevelBlueprint({
+    id: 'prism-walk-11',
+    name: '棱镜步道',
+    layout: 'stack72',
+    difficulty: 'normal',
+    chapterId: 'chapter-sunset-orchard',
+    order: 11,
+    summary: '72 张盘里会同时露出更多同色图案，辨认轮廓比辨认颜色更重要。',
+    chapterPool: CHAPTER_POOLS['chapter-sunset-orchard'],
+    varietyCount: 7,
+    fillerPattern: 'cross',
+    favoredIndex: 4,
+  }),
+  createLevelBlueprint({
+    id: 'crystal-vault-12',
+    name: '水晶花库',
+    layout: 'stack84',
+    difficulty: 'hard',
+    chapterId: 'chapter-sunset-orchard',
+    order: 12,
+    summary: '84 张收官盘把 8 类牌面都压进来，第一眼已经接近完整成局的感觉。',
+    chapterPool: CHAPTER_POOLS['chapter-sunset-orchard'],
+    varietyCount: 8,
+    fillerPattern: 'orbit',
+    favoredIndex: 5,
+  }),
+  createLevelBlueprint({
+    id: 'amber-terrace-13',
+    name: '琥珀阶庭',
+    layout: 'stack48',
     difficulty: 'hard',
     chapterId: 'chapter-verdant-lab',
     order: 13,
-    summary: '能看见的对子会更像诱饵，真正稳的解法往往在第二手。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 164, 180],
-    startingAssists: { undo: 1, hint: 1 },
-    typePool: ['ember', 'bloom', 'bell', 'cloud', 'shell', 'berry', 'pine'],
-    countProfile: [24, 22, 20, 20, 20, 20, 18],
-    opening: ['ember', 'cloud', 'shell', 'berry', 'ember', 'pine'],
-    fillerPattern: 'cross',
-  },
-  {
-    id: 'dew-labyrinth-14',
-    name: '露华迷阵',
-    layout: 'stack144',
+    summary: '第四章开场即把新条牌和字牌压在一起，48 张也会有不小的识别压力。',
+    chapterPool: CHAPTER_POOLS['chapter-verdant-lab'],
+    varietyCount: 7,
+    fillerPattern: 'paired',
+    favoredIndex: 3,
+  }),
+  createLevelBlueprint({
+    id: 'fern-fairway-14',
+    name: '蕨影长道',
+    layout: 'stack60',
     difficulty: 'hard',
     chapterId: 'chapter-verdant-lab',
     order: 14,
-    summary: '后半章切到 8 类头像，局面会更花，但仍然保留一条稳定路线。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 166, 182],
-    startingAssists: { undo: 1, hint: 1 },
-    typePool: ['ember', 'leaf', 'bloom', 'bell', 'cloud', 'shell', 'berry', 'pine'],
-    countProfile: [20, 18, 18, 18, 18, 18, 18, 16],
-    opening: ['ember', 'leaf', 'bloom', 'cloud', 'berry', 'ember'],
-    fillerPattern: 'orbit',
-  },
-  {
-    id: 'nectar-engine-15',
-    name: '蜜泉工坊',
-    layout: 'stack144',
+    summary: '60 张里新花色继续增加，顺手点单张的代价会越来越高。',
+    chapterPool: CHAPTER_POOLS['chapter-verdant-lab'],
+    varietyCount: 8,
+    fillerPattern: 'braid',
+    favoredIndex: 4,
+  }),
+  createLevelBlueprint({
+    id: 'mist-vault-15',
+    name: '迷雾花库',
+    layout: 'stack72',
     difficulty: 'hard',
     chapterId: 'chapter-verdant-lab',
     order: 15,
-    summary: '本章最后一关把 8 类头像压成更密的断对结构，要求你少犯顺序错误。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 166, 184],
-    startingAssists: { undo: 1, hint: 1 },
-    typePool: ['ember', 'leaf', 'bloom', 'bell', 'cloud', 'shell', 'berry', 'pine'],
-    countProfile: [18, 18, 18, 18, 18, 18, 18, 18],
-    opening: ['leaf', 'bloom', 'bell', 'cloud', 'shell', 'leaf'],
+    summary: '72 张盘面里的 8 类牌开始更像正式残局，顶部四格槽必须主动经营。',
+    chapterPool: CHAPTER_POOLS['chapter-verdant-lab'],
+    varietyCount: 8,
     fillerPattern: 'cross',
-  },
-  {
-    id: 'starlight-archive-16',
-    name: '星辉典藏馆',
-    layout: 'stack144',
+    favoredIndex: 5,
+  }),
+  createLevelBlueprint({
+    id: 'nectar-engine-16',
+    name: '蜜泉工坊',
+    layout: 'stack84',
     difficulty: 'hard',
-    chapterId: 'chapter-starlit-canopy',
+    chapterId: 'chapter-verdant-lab',
     order: 16,
-    summary: '终章开场不再温柔，8 类头像会反复穿插，但还留着可控的首对。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 168, 184],
-    startingAssists: { undo: 1, hint: 1 },
-    typePool: ['ember', 'leaf', 'bloom', 'bell', 'cloud', 'shell', 'berry', 'pine'],
-    countProfile: [20, 18, 18, 18, 18, 18, 18, 16],
-    opening: ['ember', 'leaf', 'cloud', 'shell', 'ember', 'pine'],
+    summary: '本章最满的一盘把 9 类牌铺满棋盘，要求你在更花的局面里看见连续机会。',
+    chapterPool: CHAPTER_POOLS['chapter-verdant-lab'],
+    varietyCount: 9,
     fillerPattern: 'orbit',
-  },
-  {
-    id: 'comet-boulevard-17',
-    name: '彗尾大道',
-    layout: 'stack144',
+    favoredIndex: 6,
+  }),
+  createLevelBlueprint({
+    id: 'starlight-archive-17',
+    name: '星辉典藏馆',
+    layout: 'stack48',
     difficulty: 'hard',
     chapterId: 'chapter-starlit-canopy',
     order: 17,
-    summary: '会连续出现“先补单张再回收连续对”的节奏考题。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 168, 186],
-    startingAssists: { undo: 1, hint: 1 },
-    typePool: ['ember', 'leaf', 'bloom', 'bell', 'cloud', 'shell', 'berry', 'pine'],
-    countProfile: [18, 18, 18, 18, 18, 18, 18, 18],
-    opening: ['leaf', 'bloom', 'bell', 'berry', 'pine', 'leaf'],
-    fillerPattern: 'cross',
-  },
-  {
-    id: 'aurora-nursery-18',
-    name: '极光苗圃',
-    layout: 'stack144',
+    summary: '终章短盘直接给 8 类牌面，让你先适应更成熟的一组字纹和花牌组合。',
+    chapterPool: CHAPTER_POOLS['chapter-starlit-canopy'],
+    varietyCount: 8,
+    fillerPattern: 'echo',
+    favoredIndex: 4,
+  }),
+  createLevelBlueprint({
+    id: 'comet-boulevard-18',
+    name: '彗尾大道',
+    layout: 'stack60',
     difficulty: 'hard',
     chapterId: 'chapter-starlit-canopy',
     order: 18,
-    summary: '第 18 关会把记忆压力再往上推一档，为 9 类头像终局做预热。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 170, 188],
-    startingAssists: { undo: 1, hint: 1 },
-    typePool: ['ember', 'leaf', 'bloom', 'bell', 'cloud', 'shell', 'berry', 'pine'],
-    countProfile: [20, 18, 18, 18, 18, 18, 18, 16],
-    opening: ['bloom', 'cloud', 'shell', 'pine', 'bloom', 'berry'],
-    fillerPattern: 'orbit',
-  },
-  {
-    id: 'midnight-trellis-19',
-    name: '午夜藤架',
-    layout: 'stack144',
+    summary: '60 张盘面加入 9 类终章花色后，图案辨识与记忆会一起开始发力。',
+    chapterPool: CHAPTER_POOLS['chapter-starlit-canopy'],
+    varietyCount: 9,
+    fillerPattern: 'cross',
+    favoredIndex: 5,
+  }),
+  createLevelBlueprint({
+    id: 'aurora-nursery-19',
+    name: '极光苗圃',
+    layout: 'stack72',
     difficulty: 'hard',
     chapterId: 'chapter-starlit-canopy',
     order: 19,
-    summary: '最终章倒数第二关加入第 9 类头像，开局只给一对明显连续对。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 172, 190],
-    startingAssists: { undo: 1, hint: 0 },
-    typePool: ['ember', 'leaf', 'bloom', 'bell', 'cloud', 'shell', 'berry', 'pine', 'wave'],
-    countProfile: [16, 16, 16, 16, 16, 16, 16, 16, 16],
-    opening: ['ember', 'leaf', 'bloom', 'cloud', 'shell', 'ember'],
+    summary: '72 张盘把 10 类牌同时带进来，图案接近但结构不同，越往后越要稳。',
+    chapterPool: CHAPTER_POOLS['chapter-starlit-canopy'],
+    varietyCount: 10,
     fillerPattern: 'orbit',
-  },
-  {
+    favoredIndex: 6,
+  }),
+  createLevelBlueprint({
     id: 'dream-bloom-20',
     name: '梦绽穹庭',
-    layout: 'stack144',
+    layout: 'stack84',
     difficulty: 'hard',
     chapterId: 'chapter-starlit-canopy',
     order: 20,
-    summary: '20 关终局把 9 类头像全部压进 144 张物品里，必须按顺序经营顶部四格槽。',
-    recommendedSelectionCount: 144,
-    starSelectionThresholds: [144, 174, 192],
-    startingAssists: { undo: 1, hint: 0 },
-    typePool: ['ember', 'leaf', 'bloom', 'bell', 'cloud', 'shell', 'berry', 'pine', 'wave'],
-    countProfile: [16, 16, 16, 16, 16, 16, 16, 16, 16],
-    opening: ['leaf', 'bloom', 'bell', 'cloud', 'berry', 'leaf'],
+    summary: '终局 84 张把 12 类牌面全部压进同一桌布里，需要稳定读层和连续收对。',
+    chapterPool: CHAPTER_POOLS['chapter-starlit-canopy'],
+    varietyCount: 12,
     fillerPattern: 'cross',
-  },
+    favoredIndex: 7,
+  }),
 ]
 
 const CHAPTERS_BY_ID = new Map(
@@ -670,9 +739,7 @@ export const CAMPAIGN: CampaignDefinition = {
 }
 
 export const CAMPAIGN_LEVELS: LevelDefinition[] = CAMPAIGN.levels
-
 export const CAMPAIGN_LEVEL_IDS: string[] = CAMPAIGN_LEVELS.map((level) => level.id)
-
 export const DEFAULT_LEVEL: LevelDefinition = CAMPAIGN_LEVELS[0]
 
 function resolveCampaignChapters(

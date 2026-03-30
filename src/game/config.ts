@@ -3,12 +3,12 @@ import type { GameConfig, TileTheme, TileType } from './types'
 export const GAME_CONFIG: GameConfig = {
   matchCount: 2,
   trayCapacity: 4,
-  boardWidth: 338,
-  boardHeight: 338,
-  tileWidth: 44,
-  tileHeight: 54,
-  blockerOverlapX: 30,
-  blockerOverlapY: 36,
+  boardWidth: 344,
+  boardHeight: 568,
+  tileWidth: 70,
+  tileHeight: 86,
+  blockerOverlapX: 34,
+  blockerOverlapY: 40,
   boardScaleBase: 1,
   animationMs: {
     matchClear: 280,
@@ -17,104 +17,249 @@ export const GAME_CONFIG: GameConfig = {
   },
 }
 
+interface ThemeBlueprint {
+  label: string
+  title: string
+  glyphKind: string
+  badgeFamily: TileTheme['badgeFamily']
+  ink: string
+  accentInk: string
+  shadowGlow: string
+  facePattern: string
+}
+
+function createTheme(blueprint: ThemeBlueprint): TileTheme {
+  return {
+    label: blueprint.label,
+    title: blueprint.title,
+    glyphKind: blueprint.glyphKind,
+    badgeFamily: blueprint.badgeFamily,
+    ink: blueprint.ink,
+    accentInk: blueprint.accentInk,
+    shadowGlow: blueprint.shadowGlow,
+    facePattern: blueprint.facePattern,
+  }
+}
+
+const INK_BLUE = '#1f5579'
+const INK_GREEN = '#2b8160'
+const INK_RED = '#cb4b41'
+const INK_BLACK = '#23201d'
+const INK_GOLD = '#b8893d'
+
+const GREEN_GLOW = 'rgba(27, 132, 68, 0.26)'
+const BLUE_GLOW = 'rgba(24, 86, 130, 0.22)'
+const RED_GLOW = 'rgba(184, 63, 54, 0.22)'
+const DARK_GLOW = 'rgba(24, 38, 34, 0.22)'
+
+const ANIMAL_PATTERN =
+  'linear-gradient(180deg, rgba(255,255,255,0.52) 0 18%, transparent 19%), radial-gradient(circle at 82% 18%, rgba(31,85,121,0.06) 0 16%, transparent 17%)'
+const DOT_PATTERN =
+  'radial-gradient(circle at 18% 20%, rgba(43,129,96,0.08) 0 14%, transparent 15%), radial-gradient(circle at 82% 82%, rgba(31,85,121,0.06) 0 15%, transparent 16%)'
+const BAMBOO_PATTERN =
+  'linear-gradient(90deg, transparent 0 20%, rgba(43,129,96,0.07) 21% 24%, transparent 25% 48%, rgba(43,129,96,0.06) 49% 52%, transparent 53%), linear-gradient(180deg, rgba(255,255,255,0.48) 0 16%, transparent 17%)'
+const SYMBOL_PATTERN =
+  'linear-gradient(135deg, transparent 0 24%, rgba(203,75,65,0.06) 25% 31%, transparent 32% 68%, rgba(43,129,96,0.06) 69% 75%, transparent 76%), radial-gradient(circle at 50% 16%, rgba(255,255,255,0.42) 0 12%, transparent 13%)'
+
 export const TILE_THEMES: Record<TileType, TileTheme> = {
-  ember: {
-    label: '焰',
-    title: '焰砖',
-    main: '#ff7a24',
-    accent: '#ffe28e',
-    shadow: 'rgba(186, 70, 0, 0.34)',
-    badge: '✦',
-    outline: 'rgba(221, 77, 0, 0.92)',
-    pattern:
-      'radial-gradient(circle at 22% 24%, rgba(255,255,255,0.42) 0 10%, transparent 11%), radial-gradient(circle at 78% 22%, rgba(255,190,82,0.36) 0 15%, transparent 16%), linear-gradient(145deg, transparent 48%, rgba(255,111,35,0.22) 49% 60%, transparent 61%)',
-  },
-  leaf: {
-    label: '叶',
-    title: '叶砖',
-    main: '#56c92b',
-    accent: '#ebff9f',
-    shadow: 'rgba(37, 117, 20, 0.32)',
-    badge: '❋',
-    outline: 'rgba(45, 149, 15, 0.9)',
-    pattern:
-      'radial-gradient(circle at 26% 70%, rgba(255,255,255,0.4) 0 12%, transparent 13%), linear-gradient(135deg, transparent 32%, rgba(131,238,92,0.32) 33% 49%, transparent 50%), linear-gradient(45deg, transparent 55%, rgba(39,154,25,0.22) 57% 68%, transparent 69%)',
-  },
-  bloom: {
+  ember: createTheme({
+    label: '犬',
+    title: '犬牌',
+    glyphKind: 'dog',
+    badgeFamily: 'animal',
+    ink: INK_BLUE,
+    accentInk: INK_GREEN,
+    shadowGlow: BLUE_GLOW,
+    facePattern: ANIMAL_PATTERN,
+  }),
+  leaf: createTheme({
+    label: '猫',
+    title: '猫牌',
+    glyphKind: 'cat',
+    badgeFamily: 'animal',
+    ink: INK_GREEN,
+    accentInk: INK_BLUE,
+    shadowGlow: GREEN_GLOW,
+    facePattern: ANIMAL_PATTERN,
+  }),
+  bloom: createTheme({
+    label: '鱼',
+    title: '鱼牌',
+    glyphKind: 'fish',
+    badgeFamily: 'animal',
+    ink: INK_GREEN,
+    accentInk: INK_BLUE,
+    shadowGlow: GREEN_GLOW,
+    facePattern: ANIMAL_PATTERN,
+  }),
+  bell: createTheme({
+    label: '龙',
+    title: '龙牌',
+    glyphKind: 'dragon',
+    badgeFamily: 'animal',
+    ink: INK_BLUE,
+    accentInk: INK_BLACK,
+    shadowGlow: BLUE_GLOW,
+    facePattern: ANIMAL_PATTERN,
+  }),
+  cloud: createTheme({
+    label: '鼠',
+    title: '鼠牌',
+    glyphKind: 'rat',
+    badgeFamily: 'animal',
+    ink: INK_BLUE,
+    accentInk: INK_BLACK,
+    shadowGlow: BLUE_GLOW,
+    facePattern: ANIMAL_PATTERN,
+  }),
+  shell: createTheme({
+    label: '猴',
+    title: '猴牌',
+    glyphKind: 'monkey',
+    badgeFamily: 'animal',
+    ink: INK_RED,
+    accentInk: INK_GOLD,
+    shadowGlow: RED_GLOW,
+    facePattern: ANIMAL_PATTERN,
+  }),
+  berry: createTheme({
+    label: '双环',
+    title: '双环牌',
+    glyphKind: 'dots-2',
+    badgeFamily: 'dots',
+    ink: INK_BLUE,
+    accentInk: INK_GREEN,
+    shadowGlow: GREEN_GLOW,
+    facePattern: DOT_PATTERN,
+  }),
+  pine: createTheme({
+    label: '四环',
+    title: '四环牌',
+    glyphKind: 'dots-4',
+    badgeFamily: 'dots',
+    ink: INK_BLUE,
+    accentInk: INK_RED,
+    shadowGlow: BLUE_GLOW,
+    facePattern: DOT_PATTERN,
+  }),
+  wave: createTheme({
+    label: '五环',
+    title: '五环牌',
+    glyphKind: 'dots-5',
+    badgeFamily: 'dots',
+    ink: INK_BLUE,
+    accentInk: INK_GREEN,
+    shadowGlow: BLUE_GLOW,
+    facePattern: DOT_PATTERN,
+  }),
+  spire: createTheme({
+    label: '六环',
+    title: '六环牌',
+    glyphKind: 'dots-6',
+    badgeFamily: 'dots',
+    ink: INK_BLUE,
+    accentInk: INK_RED,
+    shadowGlow: BLUE_GLOW,
+    facePattern: DOT_PATTERN,
+  }),
+  crown: createTheme({
+    label: '二条',
+    title: '二条牌',
+    glyphKind: 'bamboo-2',
+    badgeFamily: 'bamboo',
+    ink: INK_GREEN,
+    accentInk: INK_RED,
+    shadowGlow: GREEN_GLOW,
+    facePattern: BAMBOO_PATTERN,
+  }),
+  mask: createTheme({
+    label: '三条',
+    title: '三条牌',
+    glyphKind: 'bamboo-3',
+    badgeFamily: 'bamboo',
+    ink: INK_GREEN,
+    accentInk: INK_RED,
+    shadowGlow: GREEN_GLOW,
+    facePattern: BAMBOO_PATTERN,
+  }),
+  plume: createTheme({
+    label: '四条',
+    title: '四条牌',
+    glyphKind: 'bamboo-4',
+    badgeFamily: 'bamboo',
+    ink: INK_GREEN,
+    accentInk: INK_RED,
+    shadowGlow: GREEN_GLOW,
+    facePattern: BAMBOO_PATTERN,
+  }),
+  lantern: createTheme({
+    label: '五条',
+    title: '五条牌',
+    glyphKind: 'bamboo-5',
+    badgeFamily: 'bamboo',
+    ink: INK_GREEN,
+    accentInk: INK_RED,
+    shadowGlow: GREEN_GLOW,
+    facePattern: BAMBOO_PATTERN,
+  }),
+  dagger: createTheme({
+    label: '东',
+    title: '东牌',
+    glyphKind: 'east',
+    badgeFamily: 'symbol',
+    ink: INK_BLACK,
+    accentInk: INK_GREEN,
+    shadowGlow: DARK_GLOW,
+    facePattern: SYMBOL_PATTERN,
+  }),
+  harp: createTheme({
+    label: '南',
+    title: '南牌',
+    glyphKind: 'south',
+    badgeFamily: 'symbol',
+    ink: INK_BLACK,
+    accentInk: INK_GREEN,
+    shadowGlow: DARK_GLOW,
+    facePattern: SYMBOL_PATTERN,
+  }),
+  rose: createTheme({
+    label: '红框',
+    title: '红框牌',
+    glyphKind: 'frame-red',
+    badgeFamily: 'symbol',
+    ink: INK_RED,
+    accentInk: INK_GREEN,
+    shadowGlow: RED_GLOW,
+    facePattern: SYMBOL_PATTERN,
+  }),
+  comet: createTheme({
+    label: '绿框',
+    title: '绿框牌',
+    glyphKind: 'frame-green',
+    badgeFamily: 'symbol',
+    ink: INK_GREEN,
+    accentInk: INK_RED,
+    shadowGlow: GREEN_GLOW,
+    facePattern: SYMBOL_PATTERN,
+  }),
+  key: createTheme({
     label: '花',
-    title: '花砖',
-    main: '#ff4e97',
-    accent: '#ffe0ef',
-    shadow: 'rgba(175, 33, 101, 0.32)',
-    badge: '✿',
-    outline: 'rgba(223, 44, 125, 0.9)',
-    pattern:
-      'radial-gradient(circle at 50% 24%, rgba(255,255,255,0.44) 0 12%, transparent 13%), radial-gradient(circle at 24% 62%, rgba(255,184,226,0.34) 0 15%, transparent 16%), radial-gradient(circle at 76% 64%, rgba(255,144,197,0.28) 0 14%, transparent 15%), linear-gradient(180deg, transparent 66%, rgba(255,85,168,0.18) 67% 100%)',
-  },
-  bell: {
-    label: '铃',
-    title: '铃砖',
-    main: '#f6c514',
-    accent: '#fff2a3',
-    shadow: 'rgba(169, 119, 0, 0.32)',
-    badge: '✶',
-    outline: 'rgba(214, 155, 0, 0.92)',
-    pattern:
-      'radial-gradient(circle at 70% 24%, rgba(255,255,255,0.46) 0 11%, transparent 12%), linear-gradient(180deg, rgba(255,228,110,0.34) 0 36%, transparent 37%), linear-gradient(45deg, transparent 48%, rgba(255,193,0,0.22) 49% 58%, transparent 59%)',
-  },
-  cloud: {
-    label: '云',
-    title: '云砖',
-    main: '#5577ff',
-    accent: '#e2e9ff',
-    shadow: 'rgba(42, 68, 182, 0.34)',
-    badge: '☁',
-    outline: 'rgba(65, 96, 234, 0.92)',
-    pattern:
-      'radial-gradient(circle at 32% 32%, rgba(255,255,255,0.48) 0 14%, transparent 15%), radial-gradient(circle at 68% 36%, rgba(198,220,255,0.32) 0 16%, transparent 17%), linear-gradient(135deg, transparent 58%, rgba(94,126,255,0.22) 59% 100%)',
-  },
-  shell: {
-    label: '贝',
-    title: '贝砖',
-    main: '#17c4a8',
-    accent: '#dcfff6',
-    shadow: 'rgba(0, 114, 97, 0.3)',
-    badge: '◔',
-    outline: 'rgba(0, 166, 140, 0.9)',
-    pattern:
-      'linear-gradient(135deg, transparent 24%, rgba(170,245,231,0.38) 25% 35%, transparent 36%), linear-gradient(45deg, transparent 42%, rgba(255,255,255,0.32) 43% 52%, transparent 53%), radial-gradient(circle at 76% 70%, rgba(49,197,171,0.22) 0 17%, transparent 18%)',
-  },
-  berry: {
-    label: '果',
-    title: '果砖',
-    main: '#9b4dff',
-    accent: '#f1ddff',
-    shadow: 'rgba(88, 36, 176, 0.32)',
-    badge: '◆',
-    outline: 'rgba(108, 39, 230, 0.9)',
-    pattern:
-      'radial-gradient(circle at 28% 68%, rgba(255,255,255,0.4) 0 13%, transparent 14%), radial-gradient(circle at 70% 36%, rgba(215,170,255,0.34) 0 16%, transparent 17%), linear-gradient(180deg, transparent 62%, rgba(129,73,255,0.22) 63% 100%)',
-  },
-  pine: {
-    label: '松',
-    title: '松砖',
-    main: '#0f8a4f',
-    accent: '#d4f4cb',
-    shadow: 'rgba(12, 84, 55, 0.34)',
-    badge: '▲',
-    outline: 'rgba(11, 118, 70, 0.9)',
-    pattern:
-      'linear-gradient(180deg, rgba(255,255,255,0.3) 0 22%, transparent 23%), linear-gradient(135deg, transparent 32%, rgba(118,222,143,0.28) 33% 46%, transparent 47%), linear-gradient(45deg, transparent 56%, rgba(20,122,71,0.22) 57% 68%, transparent 69%)',
-  },
-  wave: {
-    label: '潮',
-    title: '潮砖',
-    main: '#00cdea',
-    accent: '#c6fbff',
-    shadow: 'rgba(0, 126, 164, 0.32)',
-    badge: '≈',
-    outline: 'rgba(0, 164, 205, 0.9)',
-    pattern:
-      'linear-gradient(180deg, rgba(255,255,255,0.3) 0 18%, transparent 19%), radial-gradient(circle at 68% 72%, rgba(187,247,255,0.38) 0 16%, transparent 17%), linear-gradient(135deg, transparent 48%, rgba(0,191,224,0.22) 49% 60%, transparent 61%)',
-  },
+    title: '花牌',
+    glyphKind: 'blossom',
+    badgeFamily: 'symbol',
+    ink: INK_RED,
+    accentInk: INK_GREEN,
+    shadowGlow: RED_GLOW,
+    facePattern: SYMBOL_PATTERN,
+  }),
+  pearl: createTheme({
+    label: '壶',
+    title: '壶牌',
+    glyphKind: 'gourd',
+    badgeFamily: 'symbol',
+    ink: INK_BLACK,
+    accentInk: INK_GREEN,
+    shadowGlow: DARK_GLOW,
+    facePattern: SYMBOL_PATTERN,
+  }),
 }

@@ -142,6 +142,71 @@ Remaining risk
 ---
 
 Task
+- 用户新需求: 参考 Vita Mahjong 的单局语言，把局内重构成更清楚的扑克牌/麻将牌桌体验，并补上快速单局入口；另外要求先切到独立分支，避免和并行任务冲突。
+
+Branch
+- 当前开发分支: `codex/app-vita-table-refresh`
+
+What changed
+- 单局与数据
+  - `src/game/types.ts` 把 `TileType` 扩展到 20 种，并给 `TileTheme` 增加了扑克牌展示字段。
+  - `src/game/config.ts` 重建为 20 套同色系卡牌主题，全部带 rank / suit / portrait / caption 等元数据。
+  - `src/game/levels.ts` 保留 20 关、144 张、4 槽与原有难度骨架，但把关卡 type pool 改成新的 20 种牌型体系，并把文案从“头像”统一回收为“牌型/牌面”。
+- UI 与体验
+  - `src/App.tsx` 保留现有 2 消规则与状态流，补齐了:
+    - `快速单局` 模式入口
+    - `每日挑战` 占位按钮
+    - `sessionMode` 状态输出到 `render_game_to_text`
+    - 自动轻提示保留，不消耗手动 hint
+    - 温和音效开关与本地 Web Audio 轻音效
+    - 快速单局不写入战役推进，结果页文案会区分主线/快速局
+  - 恢复并接上 `src/App.css`，确保当前扑克牌界面和单局牌桌样式真正生效。
+
+Verification
+- 自动化:
+  - `npm run lint`
+  - `npm run test -- --run`
+  - `npm run build`
+- 浏览器截图与状态:
+  - `output/web-game/vita-verify/campaign.png`
+  - `output/web-game/vita-verify/level.png`
+  - `output/web-game/vita-verify/auto-hint.png`
+  - `output/web-game/vita-verify/quick.png`
+  - `campaign-state.json` 确认首页 `sessionMode=campaign`
+  - `level-state.json` 确认进入第 1 关后 `remainingCount=144`
+  - `auto-hint-state.json` 确认约 7.6 秒后 `autoHintTileId=\"ember-1\"`
+  - `quick-state.json` 确认 `快速单局` 进入后 `sessionMode=quick`
+
+Open notes
+- `src/game/engine.test.ts` 在这轮开始前就已经有一版未提交调整，当前测试通过，但如果后面要提交，建议先单独确认里面的牌型梯度断言是否就是你想保留的目标曲线。
+- 视觉方向已经从“彩色头像砖块”转到“深绿牌桌 + 暖白牌面”，但如果还要继续往 Vita Mahjong 靠，可以下一轮优先再压缩首页信息密度、再放大局内牌面字号。
+
+---
+
+Task
+- 用户新需求: 按 Vita Mahjong 方向重构单局体验，首页和单局共用一套牌桌化外层，局内 tile 改成同色系扑克/麻将感牌面，扩到 20 种类型，并加入自动提示。
+
+In progress
+- 主线程已完成 `src/App.tsx` 和 `src/App.css` 的第一轮大改：
+  - 移除了原先“章节头像 + 局内头像砖块”主导的 UI 结构
+  - 改成“深绿桌面 + 暖白牌面 + 大按钮 + 大字号 + 高对比”的整体语言
+  - 单局 tile renderer 已替换为新的 inline SVG court-card 风格牌面组件
+  - 首页 hero / 章节概览 / 关卡卡 / 结果页都同步成牌桌风格
+  - 增加了 `7s` 自动提示，不消耗手动 hint 次数
+- 并行 worker 正在处理：
+  - `TileType` 扩到 20 种
+  - `TILE_THEMES` 与关卡数据重排
+  - 测试同步
+
+Open notes
+- 当前主线程代码默认 TileType 会新增：
+  - `spire`, `crown`, `mask`, `plume`, `lantern`, `dagger`, `harp`, `rose`, `comet`, `key`, `pearl`
+- 等 worker 合并后，要重点检查：
+  - App 里的 20 种牌面映射与 `src/game/types.ts` 是否完全一致
+  - App 测试里若有“头像”相关文案断言，是否需要同步成“牌/牌面”
+  - 移动端下 `board-shell` 和 `tray-grid` 的空间是否足够
+
+Task
 - 用户新需求: 把项目升级成“朱天宇专属游戏 v2.2”，改成章节卡通头像驱动的专属版本，并推送到远端主分支。
 
 V2.2 scope
@@ -414,3 +479,70 @@ Verification
 - 浏览器实测：
   - 首页已显示 `20` 关、`5` 个章节。
   - 第 1 关进入后顶层不再是双三连白送，而是 `焰 x3 + 叶 x2 + 花 x1` 的较温和开局。
+
+---
+
+Task
+- Vita Mahjong 风格单局重构并行数据层收尾：保持 20 关、144 张牌、顶部 4 槽和相邻 2 消规则不变，把牌型扩展到 20 种，同时修复后期关卡在贪心安全对求解下出现的残局死锁。
+
+What changed
+- `src/game/types.ts`
+  - TileType 固定为 20 种牌面类型：`ember, leaf, bloom, bell, cloud, shell, berry, pine, wave, spire, crown, mask, plume, lantern, dagger, harp, rose, comet, key, pearl`。
+  - `TileTheme` 保留兼容字段 `label/title/main/accent/shadow/badge/outline/pattern`，并补充牌面展示字段供 court-card 样式渲染使用。
+- `src/game/config.ts`
+  - TILE_THEMES 改为统一白牌、低噪音同色系的牌面主题元数据，兼容样式层并支持 20 种牌型。
+- `src/game/levels.ts`
+  - 20 关的 `typePool / countProfile / opening / recommendedSelectionCount / starSelectionThresholds / summary` 已按递进曲线重排。
+  - 铺牌构造改成“先补齐开局单张的配对，再按填充顺序成对铺牌”，避免后期只剩暴露单张的死局。
+- `src/game/engine.test.ts`
+  - 校验 20 关牌型数量递进、首关安全开局、全战役可被安全相邻对贪心路径解开。
+
+Verification
+- `npm run test -- --run`
+- `npm run lint`
+- `npm run build`
+- 结果：
+  - 26 个测试全部通过。
+  - 构建与 lint 全部通过。
+
+---
+
+Task
+- 用户新需求: 继续收尾 `codex/app-pixel-board-refresh`，把 20 关参考图风格麻将桌版本的测试、存档迁移和本地预览都跑通。
+
+What changed
+- `src/game/engine.test.ts`
+  - 把正式战役断言同步到新的 20 关曲线：
+    - 每章砖块密度固定 `48 / 60 / 72 / 84`
+    - 牌型递进固定为 `4,5,6,6,5,6,6,7,6,7,7,8,7,8,8,9,8,9,10,12`
+    - 辅助道具曲线固定为 `前 8 关 2/2，中 8 关 2/1，后 4 关 1/1`
+- `src/game/storage.test.ts`
+  - 把旧版迁移测试里的已失效关卡 ID 全部换成新的四关一章骨架：
+    - 第一章收尾改为 `dew-stair-04`
+    - 第二章开场改为 `mirror-court-05`
+    - 原“旧终点关”迁移场景改为 `glass-canopy-08`，并验证自动解锁 `sunset-orchard-09`
+- 本地验收
+  - 重新拉起 Vite 开发服务器并确认当前预览地址为 `http://127.0.0.1:4183/`
+  - 用 `develop-web-game` 脚本补抓了本轮首页和第 1 关产物
+
+Verification
+- 自动化:
+  - `npm run test -- --run`
+  - `npm run lint`
+  - `npm run build`
+- 产物:
+  - `output/web-game/pixel-board-refresh-home/shot-0.png`
+  - `output/web-game/pixel-board-refresh-home/state-0.json`
+  - `output/web-game/pixel-board-refresh-level-1/shot-0.png`
+  - `output/web-game/pixel-board-refresh-level-1/state-0.json`
+- 核对结果:
+  - 26 个测试全部通过
+  - lint 通过
+  - build 通过
+  - `render_game_to_text` 确认首页已是 `5` 章 `20` 关
+  - 第 1 关状态里已输出 `score`、`matchedPairs`、`remainingCount`
+  - 浏览器快照确认单局顶部只保留 `关卡 / 分数 / 匹配` 三项文字 HUD，顶部四格槽和底部图标按钮都存在
+
+Open notes
+- `develop-web-game` 脚本在“从首页点击进入关卡”后会停在棋盘中段视口，所以抓到的 PNG 更偏重棋盘，不一定把顶部 HUD 一起截进去；浏览器快照里 HUD 仍然正常存在。
+- 当前工作树还有这轮未提交改动；如果下一步要推远端或继续部署，可以直接在 `codex/app-pixel-board-refresh` 上接着收口。

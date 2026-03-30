@@ -256,7 +256,7 @@ describe('game engine', () => {
     expect(undoneState.assistCharges.undo).toBe(progressedState.assistCharges.undo - 1)
   })
 
-  it('ships a 20-level campaign and keeps the default level built as a 144-item stack', () => {
+  it('ships a 20-level campaign with the 48/60/72/84 chapter density curve', () => {
     const tileCounts = DEFAULT_LEVEL.tiles.reduce<Record<string, number>>((counts, tile) => {
       counts[tile.type] = (counts[tile.type] ?? 0) + 1
       return counts
@@ -267,16 +267,23 @@ describe('game engine', () => {
     expect(DEFAULT_LEVEL.id).toBe('thorn-garden-01')
     expect(DEFAULT_LEVEL.name).toBe('荆棘迷圃')
     expect(DEFAULT_LEVEL.difficulty).toBe('easy')
-    expect(DEFAULT_LEVEL.tiles).toHaveLength(144)
+    expect(DEFAULT_LEVEL.tiles).toHaveLength(48)
     expect(Object.values(tileCounts).every((count) => count % GAME_CONFIG.matchCount === 0)).toBe(true)
+    expect(CAMPAIGN_LEVELS.map((level) => level.tiles.length)).toEqual([
+      48, 60, 72, 84,
+      48, 60, 72, 84,
+      48, 60, 72, 84,
+      48, 60, 72, 84,
+      48, 60, 72, 84,
+    ])
   })
 
   it('starts the default level with a compact visible opening layer', () => {
     const state = createInitialGameState(DEFAULT_LEVEL, 'playing')
     const exposedTiles = DEFAULT_LEVEL.tiles.filter((tile) => !isTileBlocked(tile.id, state, GAME_CONFIG))
 
-    expect(exposedTiles).toHaveLength(26)
-    expect(DEFAULT_LEVEL.tiles.filter((tile) => isTileBlocked(tile.id, state, GAME_CONFIG))).toHaveLength(118)
+    expect(exposedTiles).toHaveLength(17)
+    expect(DEFAULT_LEVEL.tiles.filter((tile) => isTileBlocked(tile.id, state, GAME_CONFIG))).toHaveLength(31)
   })
 
   it('starts the default level with four visible tile types and immediate safe pairs', () => {
@@ -288,12 +295,12 @@ describe('game engine', () => {
     }, {})
 
     expect(Object.keys(exposedTypeCounts)).toHaveLength(4)
-    expect(Object.values(exposedTypeCounts).every((count) => count >= 4)).toBe(true)
+    expect(Object.values(exposedTypeCounts).every((count) => count >= 3)).toBe(true)
   })
 
   it('ramps tile variety across the 20-level campaign', () => {
     expect(CAMPAIGN_LEVELS.map((level) => getLevelUniqueTypeCount(level))).toEqual([
-      4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 9, 9,
+      4, 5, 6, 6, 5, 6, 6, 7, 6, 7, 7, 8, 7, 8, 8, 9, 8, 9, 10, 12,
     ])
   })
 
@@ -303,6 +310,14 @@ describe('game engine', () => {
       { undo: 2, hint: 2 },
       { undo: 2, hint: 2 },
       { undo: 2, hint: 2 },
+      { undo: 2, hint: 2 },
+      { undo: 2, hint: 2 },
+      { undo: 2, hint: 2 },
+      { undo: 2, hint: 2 },
+      { undo: 2, hint: 1 },
+      { undo: 2, hint: 1 },
+      { undo: 2, hint: 1 },
+      { undo: 2, hint: 1 },
       { undo: 2, hint: 1 },
       { undo: 2, hint: 1 },
       { undo: 2, hint: 1 },
@@ -311,14 +326,6 @@ describe('game engine', () => {
       { undo: 1, hint: 1 },
       { undo: 1, hint: 1 },
       { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 0 },
-      { undo: 1, hint: 0 },
     ])
   })
 

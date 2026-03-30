@@ -117,31 +117,38 @@ describe('campaign helpers and storage', () => {
       JSON.stringify({
         version: 1,
         campaignId: CAMPAIGN.id,
-        currentLevelId: 'mirror-court-04',
+        currentLevelId: 'mirror-court-05',
         unlockedLevelIds: [
           'thorn-garden-01',
           'lantern-steps-02',
           'ivy-arcade-03',
-          'mirror-court-04',
+          'dew-stair-04',
+          'mirror-court-05',
         ],
-        completedLevelIds: ['thorn-garden-01', 'lantern-steps-02', 'ivy-arcade-03'],
+        completedLevelIds: [
+          'thorn-garden-01',
+          'lantern-steps-02',
+          'ivy-arcade-03',
+          'dew-stair-04',
+        ],
       }),
     )
 
     const progress = loadCampaignProgress(CAMPAIGN)
 
     expect(progress.version).toBe(2)
-    expect(progress.currentLevelId).toBe('mirror-court-04')
+    expect(progress.currentLevelId).toBe('mirror-court-05')
     expect(progress.currentChapterId).toBe('chapter-mirror-court')
     expect(progress.chapterRecords['chapter-bloom-path'].completed).toBe(true)
     expect(progress.chapterRecords['chapter-bloom-path'].completedLevelIds).toEqual([
       'thorn-garden-01',
       'lantern-steps-02',
       'ivy-arcade-03',
+      'dew-stair-04',
     ])
     expect(progress.chapterRecords['chapter-mirror-court'].unlocked).toBe(true)
     expect(progress.chapterRecords['chapter-mirror-court'].unlockedLevelIds).toContain(
-      'mirror-court-04',
+      'mirror-court-05',
     )
     expect(
       window.localStorage.getItem(`brick-match:campaign-progress:${CAMPAIGN.id}`),
@@ -155,22 +162,26 @@ describe('campaign helpers and storage', () => {
         version: 2,
         campaignId: CAMPAIGN.id,
         currentChapterId: 'chapter-mirror-court',
-        currentLevelId: 'crown-greenhouse-06',
+        currentLevelId: 'glass-canopy-08',
         unlockedLevelIds: [
           'thorn-garden-01',
           'lantern-steps-02',
           'ivy-arcade-03',
-          'mirror-court-04',
-          'moon-pond-05',
-          'crown-greenhouse-06',
+          'dew-stair-04',
+          'mirror-court-05',
+          'moon-pond-06',
+          'silver-river-07',
+          'glass-canopy-08',
         ],
         completedLevelIds: [
           'thorn-garden-01',
           'lantern-steps-02',
           'ivy-arcade-03',
-          'mirror-court-04',
-          'moon-pond-05',
-          'crown-greenhouse-06',
+          'dew-stair-04',
+          'mirror-court-05',
+          'moon-pond-06',
+          'silver-river-07',
+          'glass-canopy-08',
         ],
         chapterRecords: {},
         levelRecords: {},
@@ -179,10 +190,10 @@ describe('campaign helpers and storage', () => {
 
     const progress = loadCampaignProgress(CAMPAIGN)
 
-    expect(progress.currentLevelId).toBe('crown-greenhouse-06')
-    expect(progress.levelRecords['crown-greenhouse-06'].completed).toBe(true)
-    expect(progress.levelRecords['sunset-orchard-07'].unlocked).toBe(true)
-    expect(progress.unlockedLevelIds).toContain('sunset-orchard-07')
+    expect(progress.currentLevelId).toBe('glass-canopy-08')
+    expect(progress.levelRecords['glass-canopy-08'].completed).toBe(true)
+    expect(progress.levelRecords['sunset-orchard-09'].unlocked).toBe(true)
+    expect(progress.unlockedLevelIds).toContain('sunset-orchard-09')
     expect(progress.chapterRecords['chapter-mirror-court'].completed).toBe(true)
   })
 

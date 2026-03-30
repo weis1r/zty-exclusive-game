@@ -8,6 +8,17 @@ export type TileType =
   | 'berry'
   | 'pine'
   | 'wave'
+  | 'spire'
+  | 'crown'
+  | 'mask'
+  | 'plume'
+  | 'lantern'
+  | 'dagger'
+  | 'harp'
+  | 'rose'
+  | 'comet'
+  | 'key'
+  | 'pearl'
 
 export interface TileDefinition {
   id: string
@@ -158,12 +169,12 @@ export interface LevelCompletionStats {
 export interface TileTheme {
   label: string
   title: string
-  main: string
-  accent: string
-  shadow: string
-  badge: string
-  outline: string
-  pattern: string
+  glyphKind: string
+  badgeFamily: 'animal' | 'dots' | 'bamboo' | 'symbol'
+  ink: string
+  accentInk: string
+  shadowGlow: string
+  facePattern: string
 }
 
 export interface GameConfig {
