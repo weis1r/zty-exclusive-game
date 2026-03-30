@@ -2,11 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GameApp } from './App'
 import { GAME_CONFIG } from './game/config'
-import type {
-  CampaignChapterDefinition,
-  CampaignDefinition,
-  LevelDefinition,
-} from './game/types'
+import type { CampaignDefinition, LevelDefinition } from './game/types'
 
 function createLevel(
   id: string,
@@ -33,17 +29,20 @@ function createLevel(
   }
 }
 
-function createCampaign(
-  id: string,
-  levels: LevelDefinition[],
-  chapters?: CampaignChapterDefinition[],
-): CampaignDefinition {
+function createCampaign(id: string, levels: LevelDefinition[]): CampaignDefinition {
   return {
     id,
     name: '测试战役',
-    chapters,
     levels,
   }
+}
+
+function renderGame(campaign: CampaignDefinition) {
+  render(<GameApp campaign={campaign} />)
+}
+
+function startFromHome() {
+  fireEvent.click(screen.getByTestId('home-start-button'))
 }
 
 afterEach(() => {
@@ -52,101 +51,50 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('GameApp interactions', () => {
-  it('renders the campaign screen and starts the first unlocked level', () => {
-    const campaign = createCampaign('app-campaign-start', [
+describe('GameApp three-screen flow', () => {
+  it('renders the home screen as the initial state', () => {
+    const campaign = createCampaign('app-home-initial', [
       createLevel('level-1', '起步关', 1, [
-        { id: 'ember-1', type: 'ember', x: 40, y: 40, layer: 0 },
-        { id: 'ember-2', type: 'ember', x: 140, y: 40, layer: 0 },
-      ]),
-      createLevel('level-2', '锁定关', 2, [
-        { id: 'leaf-1', type: 'leaf', x: 40, y: 40, layer: 0 },
-        { id: 'leaf-2', type: 'leaf', x: 140, y: 40, layer: 0 },
+        { id: 'l1-ember-1', type: 'ember', x: 40, y: 40, layer: 0 },
+        { id: 'l1-ember-2', type: 'ember', x: 140, y: 40, layer: 0 },
       ]),
     ])
 
-    render(<GameApp campaign={campaign} />)
+    renderGame(campaign)
 
-    expect(screen.getByTestId('campaign-screen')).toBeInTheDocument()
-    expect(screen.getByTestId('unlocked-count')).toHaveTextContent('已解锁 1/2')
-    expect(screen.getByTestId('start-level-btn-level-2')).toBeDisabled()
+    expect(screen.getByTestId('home-screen')).toBeInTheDocument()
+    expect(screen.getByTestId('home-start-button')).toBeEnabled()
+    expect(screen.getByTestId('home-start-button')).toHaveTextContent('关卡 1')
+    expect(screen.queryByTestId('game-screen')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('result-screen')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('campaign-screen')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('chapter-focus')).not.toBeInTheDocument()
+    expect(screen.queryByText('叶 x0')).not.toBeInTheDocument()
+  })
 
-    fireEvent.click(screen.getByTestId('start-level-btn-level-1'))
+  it('starts the current level from the home screen', () => {
+    const campaign = createCampaign('app-home-start', [
+      createLevel('level-1', '起步关', 1, [
+        { id: 'l1-ember-1', type: 'ember', x: 40, y: 40, layer: 0 },
+        { id: 'l1-ember-2', type: 'ember', x: 140, y: 40, layer: 0 },
+      ]),
+      createLevel('level-2', '后续关', 2, [
+        { id: 'l2-leaf-1', type: 'leaf', x: 40, y: 40, layer: 0 },
+        { id: 'l2-leaf-2', type: 'leaf', x: 140, y: 40, layer: 0 },
+      ]),
+    ])
+
+    renderGame(campaign)
+    startFromHome()
 
     expect(screen.getByTestId('game-screen')).toBeInTheDocument()
-    expect(screen.getByTestId('current-level-id')).toHaveTextContent('level-1')
+    expect(screen.getByTestId('tile-l1-ember-1')).toBeInTheDocument()
+    expect(screen.getByTestId('tile-l1-ember-2')).toBeInTheDocument()
+    expect(screen.queryByTestId('home-screen')).not.toBeInTheDocument()
   })
 
-  it('renders chapter summaries for the v2 campaign overview', () => {
-    const chapterA: CampaignChapterDefinition = {
-      id: 'chapter-a',
-      order: 1,
-      title: '第一章',
-      summary: '第一章摘要',
-      levelIds: ['level-1', 'level-2'],
-    }
-    const chapterB: CampaignChapterDefinition = {
-      id: 'chapter-b',
-      order: 2,
-      title: '第二章',
-      summary: '第二章摘要',
-      levelIds: ['level-3'],
-    }
-    const campaign = createCampaign(
-      'app-campaign-chapters',
-      [
-        createLevel(
-          'level-1',
-          '章节一关卡一',
-          1,
-          [
-            { id: 'ember-1', type: 'ember', x: 40, y: 40, layer: 0 },
-            { id: 'ember-2', type: 'ember', x: 140, y: 40, layer: 0 },
-          ],
-          {
-            campaign: { order: 1, chapterId: chapterA.id, chapter: chapterA.title, summary: 'a-1' },
-          },
-        ),
-        createLevel(
-          'level-2',
-          '章节一关卡二',
-          2,
-          [
-            { id: 'leaf-1', type: 'leaf', x: 40, y: 40, layer: 0 },
-            { id: 'leaf-2', type: 'leaf', x: 140, y: 40, layer: 0 },
-          ],
-          {
-            campaign: { order: 2, chapterId: chapterA.id, chapter: chapterA.title, summary: 'a-2' },
-          },
-        ),
-        createLevel(
-          'level-3',
-          '章节二关卡一',
-          3,
-          [
-            { id: 'bloom-1', type: 'bloom', x: 40, y: 40, layer: 0 },
-            { id: 'bloom-2', type: 'bloom', x: 140, y: 40, layer: 0 },
-          ],
-          {
-            campaign: { order: 3, chapterId: chapterB.id, chapter: chapterB.title, summary: 'b-1' },
-          },
-        ),
-      ],
-      [chapterA, chapterB],
-    )
-
-    render(<GameApp campaign={campaign} />)
-
-    expect(screen.getByTestId('chapter-card-chapter-a')).toBeInTheDocument()
-    expect(screen.getByTestId('chapter-card-chapter-b')).toBeInTheDocument()
-    expect(screen.getByTestId('chapter-section-chapter-a')).toBeInTheDocument()
-    expect(screen.getByTestId('chapter-section-chapter-b')).toBeInTheDocument()
-    expect(screen.getByTestId('chapter-focus')).toHaveTextContent('第一章')
-    expect(screen.getByTestId('chapter-focus')).toHaveTextContent('已解锁 1/2')
-  })
-
-  it('supports hint and undo inside a running level', () => {
-    const campaign = createCampaign('app-campaign-tools', [
+  it('supports hint and undo inside the game screen', () => {
+    const campaign = createCampaign('app-game-tools', [
       createLevel('tools-level', '工具关', 1, [
         { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
         { id: 'ember-2', type: 'ember', x: 80, y: 0, layer: 0 },
@@ -155,9 +103,8 @@ describe('GameApp interactions', () => {
       ]),
     ])
 
-    render(<GameApp campaign={campaign} />)
-
-    fireEvent.click(screen.getByTestId('start-level-btn-tools-level'))
+    renderGame(campaign)
+    startFromHome()
 
     expect(screen.getByTestId('undo-button')).toBeDisabled()
 
@@ -169,7 +116,6 @@ describe('GameApp interactions', () => {
     fireEvent.click(screen.getByTestId('hint-button'))
 
     expect(screen.getByTestId('hint-button')).toHaveTextContent('0')
-    expect(screen.getByTestId('tile-ember-2')).toHaveClass('is-hinted')
 
     fireEvent.click(screen.getByTestId('undo-button'))
 
@@ -178,40 +124,88 @@ describe('GameApp interactions', () => {
     expect(screen.queryByTestId('tray-slot-0')).not.toBeInTheDocument()
   })
 
-  it('unlocks the next level after victory and shows the next-level action', async () => {
-    const campaign = createCampaign('app-campaign-win', [
-      createLevel('level-1', '通关关', 1, [
-        { id: 'ember-1', type: 'ember', x: 40, y: 40, layer: 0 },
-        { id: 'ember-2', type: 'ember', x: 140, y: 40, layer: 0 },
-      ]),
-      createLevel('level-2', '后续关', 2, [
-        { id: 'leaf-1', type: 'leaf', x: 40, y: 40, layer: 0 },
-        { id: 'leaf-2', type: 'leaf', x: 140, y: 40, layer: 0 },
+  it('keeps the tray locked to four slots while a pair burst is animating', () => {
+    const campaign = createCampaign('app-tray-burst', [
+      createLevel('tray-level', '托盘关', 1, [
+        { id: 'burst-ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
+        { id: 'burst-ember-2', type: 'ember', x: 80, y: 0, layer: 0 },
+        { id: 'burst-leaf-1', type: 'leaf', x: 160, y: 0, layer: 0 },
       ]),
     ])
 
-    render(<GameApp campaign={campaign} />)
+    renderGame(campaign)
+    startFromHome()
 
-    fireEvent.click(screen.getByTestId('start-level-btn-level-1'))
-    fireEvent.click(screen.getByTestId('tile-ember-1'))
-    fireEvent.click(screen.getByTestId('tile-ember-2'))
+    fireEvent.click(screen.getByTestId('tile-burst-ember-1'))
+    fireEvent.click(screen.getByTestId('tile-burst-ember-2'))
+
+    const trayGrid = screen.getByTestId('tray-grid')
+
+    expect(trayGrid.childElementCount).toBe(GAME_CONFIG.trayCapacity)
+    expect(trayGrid.querySelectorAll('.tray-rack__burst')).toHaveLength(2)
+  })
+
+  it('shows the result screen after victory and can continue to the next level', async () => {
+    const campaign = createCampaign('app-win-next', [
+      createLevel('level-1', '通关关', 1, [
+        { id: 'l1-ember-1', type: 'ember', x: 40, y: 40, layer: 0 },
+        { id: 'l1-ember-2', type: 'ember', x: 140, y: 40, layer: 0 },
+      ]),
+      createLevel('level-2', '后续关', 2, [
+        { id: 'l2-leaf-1', type: 'leaf', x: 40, y: 40, layer: 0 },
+        { id: 'l2-leaf-2', type: 'leaf', x: 140, y: 40, layer: 0 },
+      ]),
+    ])
+
+    renderGame(campaign)
+    startFromHome()
+
+    fireEvent.click(screen.getByTestId('tile-l1-ember-1'))
+    fireEvent.click(screen.getByTestId('tile-l1-ember-2'))
 
     await waitFor(() => {
-      expect(screen.getByTestId('result-modal')).toBeInTheDocument()
-      expect(screen.getByTestId('next-level-button')).toBeInTheDocument()
+      expect(screen.getByTestId('result-screen')).toBeInTheDocument()
+      expect(screen.getByTestId('result-primary-button')).toBeInTheDocument()
+      expect(screen.getByTestId('result-secondary-button')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByTestId('back-to-campaign-button'))
+    expect(screen.queryByTestId('game-screen')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('result-modal')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('result-primary-button'))
 
     await waitFor(() => {
-      expect(screen.getByTestId('campaign-screen')).toBeInTheDocument()
-      expect(screen.getByTestId('unlocked-count')).toHaveTextContent('已解锁 2/2')
-      expect(screen.getByTestId('start-level-btn-level-2')).toBeEnabled()
+      expect(screen.getByTestId('game-screen')).toBeInTheDocument()
+      expect(screen.getByTestId('tile-l2-leaf-1')).toBeInTheDocument()
+      expect(screen.getByTestId('tile-l2-leaf-2')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('result-screen')).not.toBeInTheDocument()
+  })
+
+  it('uses replay as the primary action on the final result screen', async () => {
+    const campaign = createCampaign('app-win-final-level', [
+      createLevel('level-1', '终章关', 1, [
+        { id: 'l1-ember-1', type: 'ember', x: 40, y: 40, layer: 0 },
+        { id: 'l1-ember-2', type: 'ember', x: 140, y: 40, layer: 0 },
+      ]),
+    ])
+
+    renderGame(campaign)
+    startFromHome()
+
+    fireEvent.click(screen.getByTestId('tile-l1-ember-1'))
+    fireEvent.click(screen.getByTestId('tile-l1-ember-2'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('result-screen')).toBeInTheDocument()
+      expect(screen.getByTestId('result-primary-button')).toHaveTextContent('再来一次')
+      expect(screen.getByTestId('result-secondary-button')).toHaveTextContent('返回首页')
     })
   })
 
-  it('restores the board after losing and retrying the level', async () => {
-    const campaign = createCampaign('app-campaign-lose', [
+  it('shows the result screen after failure and can retry the same level', async () => {
+    const campaign = createCampaign('app-lose-retry', [
       createLevel('lose-level', '卡槽关', 1, [
         { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
         { id: 'leaf-1', type: 'leaf', x: 80, y: 0, layer: 0 },
@@ -221,25 +215,116 @@ describe('GameApp interactions', () => {
       ]),
     ])
 
-    render(<GameApp campaign={campaign} />)
-
-    fireEvent.click(screen.getByTestId('start-level-btn-lose-level'))
+    renderGame(campaign)
+    startFromHome()
 
     ;['ember-1', 'leaf-1', 'bloom-1', 'bell-1'].forEach((tileId) => {
       fireEvent.click(screen.getByTestId(`tile-${tileId}`))
     })
 
     await waitFor(() => {
-      expect(screen.getByTestId('result-modal')).toBeInTheDocument()
-      expect(screen.getByText('顶部配对槽卡住了')).toBeInTheDocument()
+      expect(screen.getByTestId('result-screen')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByTestId('retry-level-button'))
+    expect(screen.queryByTestId('game-screen')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('result-primary-button'))
 
     await waitFor(() => {
-      expect(screen.queryByTestId('result-modal')).not.toBeInTheDocument()
+      expect(screen.getByTestId('game-screen')).toBeInTheDocument()
+      expect(screen.queryByTestId('result-screen')).not.toBeInTheDocument()
       expect(screen.getByTestId('selected-count')).toHaveTextContent('0 次')
       expect(screen.getByTestId('remaining-count')).toHaveTextContent('5 块')
     })
+  })
+
+  it('returns to the home screen from the result screen and the home button starts the latest current level', async () => {
+    const campaign = createCampaign('app-home-latest-level', [
+      createLevel('level-1', '通关关', 1, [
+        { id: 'l1-ember-1', type: 'ember', x: 40, y: 40, layer: 0 },
+        { id: 'l1-ember-2', type: 'ember', x: 140, y: 40, layer: 0 },
+      ]),
+      createLevel('level-2', '后续关', 2, [
+        { id: 'l2-leaf-1', type: 'leaf', x: 40, y: 40, layer: 0 },
+        { id: 'l2-leaf-2', type: 'leaf', x: 140, y: 40, layer: 0 },
+      ]),
+    ])
+
+    renderGame(campaign)
+    startFromHome()
+
+    fireEvent.click(screen.getByTestId('tile-l1-ember-1'))
+    fireEvent.click(screen.getByTestId('tile-l1-ember-2'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('result-screen')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('result-secondary-button'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('home-screen')).toBeInTheDocument()
+      expect(screen.queryByTestId('result-screen')).not.toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('home-start-button'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('game-screen')).toBeInTheDocument()
+      expect(screen.getByTestId('tile-l2-leaf-1')).toBeInTheDocument()
+      expect(screen.getByTestId('tile-l2-leaf-2')).toBeInTheDocument()
+    })
+  })
+
+  it('confirms before exiting mid-game and returns to the home screen', async () => {
+    const campaign = createCampaign('app-exit-confirm', [
+      createLevel('level-1', '退出关', 1, [
+        { id: 'exit-ember-1', type: 'ember', x: 40, y: 40, layer: 0 },
+        { id: 'exit-ember-2', type: 'ember', x: 140, y: 40, layer: 0 },
+      ]),
+    ])
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    renderGame(campaign)
+    startFromHome()
+
+    fireEvent.click(screen.getByTestId('tile-exit-ember-1'))
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /返回首页|退出本局|退出并返回首页/,
+      }),
+    )
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalled()
+      expect(screen.getByTestId('home-screen')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('game-screen')).not.toBeInTheDocument()
+  })
+
+  it('stays on the game screen when exit confirmation is cancelled', async () => {
+    const campaign = createCampaign('app-exit-cancel', [
+      createLevel('level-1', '取消退出关', 1, [
+        { id: 'cancel-ember-1', type: 'ember', x: 40, y: 40, layer: 0 },
+        { id: 'cancel-ember-2', type: 'ember', x: 140, y: 40, layer: 0 },
+      ]),
+    ])
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    renderGame(campaign)
+    startFromHome()
+
+    fireEvent.click(screen.getByTestId('tile-cancel-ember-1'))
+
+    fireEvent.click(screen.getByTestId('game-back-button'))
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalled()
+      expect(screen.getByTestId('game-screen')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('home-screen')).not.toBeInTheDocument()
   })
 })

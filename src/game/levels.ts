@@ -234,8 +234,8 @@ const STACK_144_SLOTS: TileSlot[] = repeatSlots(STACK_36_SLOTS, 4, 4)
 const LEVEL_LAYOUTS: Record<LevelLayoutId, LevelLayoutDefinition> = {
   stack144: {
     slots: STACK_144_SLOTS,
-    boardWidth: 360,
-    boardHeight: 520,
+    boardWidth: 356,
+    boardHeight: 450,
     openingCount: 6,
   },
 }

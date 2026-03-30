@@ -219,6 +219,62 @@ Next suggestions
 ---
 
 Task
+- 用户新需求: 在 `codex/app-vita-table-refresh` 基线上创建 `美术表现222` 分支，把项目重构成严格三屏 `首页 -> 游戏页 -> 结果页`，并加强 Vita 风格美术表现。
+
+What changed
+- 已从干净基线创建独立 worktree / 分支 `美术表现222`，避开旧分支未提交改动。
+- 将巨型 `App.tsx` 拆为三屏结构：
+  - `src/screens/HomeScreen.tsx`
+  - `src/screens/GameScreen.tsx`
+  - `src/screens/ResultScreen.tsx`
+  - `src/screens/screen-types.ts`
+  - `src/components/TilePiece.tsx`
+- `App.tsx` 页面状态改为 `home | game | result`，并新增独立 `RoundSummary` 结果态。
+- 首页收口为单入口：
+  - 只保留 logo、当前关卡入口、右上角设置
+  - 去掉首页头像 / 资源条等无关包装
+  - CTA 固定为 `关卡 N`
+- 游戏页保留局内 HUD、顶部四槽、棋盘、底部道具区，并保留返回确认、提示、撤销。
+- 结果页改为独立整页，不再是弹窗；末关主按钮固定为 `再来一次`，次按钮为 `返回首页`。
+- `src/App.css` 已按三屏重整，并补了更统一的木质 / 和风 / 台面质感、入场动效、提示高亮动效和 `prefers-reduced-motion` 兼容。
+- `src/App.test.tsx` 已对齐三屏流转，并补了：
+  - 首页单入口断言
+  - 末关胜利主按钮断言
+  - 中途退出确认取消时留在游戏页
+
+Pending verification
+- 待执行 `npm run test`
+- 待执行 `npm run lint`
+- 待执行 `npm run build`
+- 待做本地预览与三屏交互巡检
+
+Verification
+- 依赖
+  - 在新 worktree 执行了 `npm install`
+- 自动化检查
+  - `npm run test -- --run`
+  - `npm run lint`
+  - `npm run build`
+- 结果
+  - 3 个测试文件、30 个测试全部通过
+  - lint 通过
+  - build 通过
+- 自动化与视觉巡检
+  - `develop-web-game` 客户端产物：
+    - `output/web-game/meishu222-home/shot-0.png`
+    - `output/web-game/meishu222-home/state-0.json`
+    - `output/web-game/meishu222-game/shot-0.png`
+    - `output/web-game/meishu222-game/state-0.json`
+  - Playwright MCP 实机巡检：
+    - 首页确认只保留 logo、当前关卡文案、单入口 CTA、右上角设置
+    - 游戏页确认 HUD / 顶部四槽 / 棋盘 / 底部道具区层次正确
+    - 用真实贪心通关路径手动点完第 1 关，结果页成功展示 `关卡 2` 主按钮与 `返回首页` 次按钮
+    - 从结果页回首页后，首页入口已自动推进到 `关卡 2`
+
+Notes
+- `develop-web-game` 客户端在点击首页 CTA 时会受入场动画稳定性判定影响，产出的 `meishu222-game/state-0.json` 仍停留在首页；后续我已用 Playwright MCP 实机点击补完游戏页与结果页验证。
+
+Task
 - 用户新需求: 这个能不能再优化一下, 改成写实版本的 icon
 
 What changed
@@ -414,3 +470,36 @@ Verification
 - 浏览器实测：
   - 首页已显示 `20` 关、`5` 个章节。
   - 第 1 关进入后顶层不再是双三连白送，而是 `焰 x3 + 叶 x2 + 花 x1` 的较温和开局。
+
+---
+
+Task
+- 用户新需求: 继续优化美术表现，重点处理“棋盘铺满屏幕、去掉红色涂层、牌面更错落、修复消除后托盘多出格子”的问题，并最终推送 `美术表现222` 分支。
+
+What changed
+- `src/game/levels.ts`
+  - 把 `STACK_36_SLOTS` 恢复到原本通过可解性验证的稳定坐标，避免因为几何改动破坏开局暴露数和第 19 关可解路径。
+  - 保留更紧凑的 `boardWidth: 356` / `boardHeight: 450`，让同一套稳定牌阵在新 Vita 界面里占比更满。
+- `src/screens/GameScreen.tsx`
+  - 保留“消除爆发贴在槽位内部”的实现，修复配对动画期间把托盘撑成第二排的问题。
+  - 给棋盘砖块增加轻量、确定性的视觉错落偏移和小角度旋转，但只作用于牌面视觉层，不移动真实按钮 hitbox。
+- `src/App.css`
+  - 继续沿用本轮三屏 Vita 风格，保持已移除的旧涂层背景不回归。
+  - 把棋盘砖块的视觉尺寸放大到 `78 x 100`，但按钮点击框维持 `72 x 92`，既提升铺满感，也避免叠牌后点击被错误拦截。
+- `src/App.test.tsx`
+  - 新增“配对爆发时托盘仍固定 4 格”的回归测试，防止再次出现消除后多出一排空槽。
+
+Verification
+- 全量自动化:
+  - `npm run test -- --run`
+  - `npm run lint`
+  - `npm run build`
+- 浏览器实测:
+  - 本地 Vite: `http://127.0.0.1:4190/`
+  - 已确认首页、游戏页、结果流转正常。
+  - 已确认两张同类牌配对后，托盘仍保持单行 `4` 槽，不会再冒出第二排虚线格。
+  - 已确认棋盘牌面更满、更有轻微错落感，同时仍能正常点选推进。
+
+Open notes
+- 当前“错落感”是渲染层微偏移，不改真实解法几何；这是为了同时满足美术自然度和 20 关可解性约束。
+- Playwright 验证时，部分被上层压住中心点的可点击牌需要点击其实际露出区域，这是叠牌玩法本身允许的情况；主流程中的可点牌与托盘行为都已复测通过。
