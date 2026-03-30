@@ -51,50 +51,35 @@ function resolveTrayMatches(
   trayTiles: TrayTile[],
   matchCount: number,
 ): { nextTrayTiles: TrayTile[]; matchBursts: MatchBurst[] } {
-  const matchBursts: MatchBurst[] = []
-  let nextTrayTiles = [...trayTiles]
-  let foundMatch = true
-
-  while (foundMatch) {
-    foundMatch = false
-
-    for (let cursor = 0; cursor < nextTrayTiles.length; cursor += 1) {
-      const runStart = cursor
-      const runType = nextTrayTiles[cursor].type
-
-      while (cursor + 1 < nextTrayTiles.length && nextTrayTiles[cursor + 1].type === runType) {
-        cursor += 1
-      }
-
-      const runLength = cursor - runStart + 1
-
-      if (runLength < matchCount) {
-        continue
-      }
-
-      const removableCount = Math.floor(runLength / matchCount) * matchCount
-
-      for (let offset = 0; offset < removableCount; offset += 1) {
-        const trayTile = nextTrayTiles[runStart + offset]
-
-        matchBursts.push({
-          id: trayTile.entryId,
-          slotIndex: runStart + offset,
-          type: trayTile.type,
-        })
-      }
-
-      nextTrayTiles = [
-        ...nextTrayTiles.slice(0, runStart),
-        ...nextTrayTiles.slice(runStart + removableCount),
-      ]
-      foundMatch = true
-      break
+  if (trayTiles.length < matchCount) {
+    return {
+      nextTrayTiles: [...trayTiles],
+      matchBursts: [],
     }
   }
 
+  const tailTiles = trayTiles.slice(-matchCount)
+  const tailType = tailTiles[0]?.type
+  const allTailTilesMatch = tailType
+    ? tailTiles.every((trayTile) => trayTile.type === tailType)
+    : false
+
+  if (!allTailTilesMatch) {
+    return {
+      nextTrayTiles: [...trayTiles],
+      matchBursts: [],
+    }
+  }
+
+  const runStart = trayTiles.length - matchCount
+  const matchBursts = tailTiles.map((trayTile, index) => ({
+    id: trayTile.entryId,
+    slotIndex: runStart + index,
+    type: trayTile.type,
+  }))
+
   return {
-    nextTrayTiles,
+    nextTrayTiles: trayTiles.slice(0, runStart),
     matchBursts,
   }
 }

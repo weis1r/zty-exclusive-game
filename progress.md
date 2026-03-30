@@ -546,3 +546,85 @@ Verification
 Open notes
 - `develop-web-game` 脚本在“从首页点击进入关卡”后会停在棋盘中段视口，所以抓到的 PNG 更偏重棋盘，不一定把顶部 HUD 一起截进去；浏览器快照里 HUD 仍然正常存在。
 - 当前工作树还有这轮未提交改动；如果下一步要推远端或继续部署，可以直接在 `codex/app-pixel-board-refresh` 上接着收口。
+
+---
+
+Task
+- 用户新需求: 继续优化单局美术表现，并把顶部槽配对规则收紧为“下叠 2 层之后就不可以对消”。
+
+What changed
+- `src/game/engine.ts`
+  - 顶部槽配对逻辑从“扫描整条槽并递归清对”改成“只检查当前槽尾刚形成的那一对”。
+  - 结果是埋在中间或被更新牌压住的内部对子不会再被自动清除，也不会触发连锁清对。
+- `src/game/engine.test.ts`
+  - 新增内部对子不清除的回归测试，直接锁住这条新规则。
+- `src/App.tsx`
+  - `CardFace` 从单层白卡升级成更完整的麻将砖牌面：
+    - 增加角标
+    - 增加中心压纹底托
+    - 保留更清楚的家族识别
+- `src/App.css`
+  - 棋盘底板、槽位、砖块本体和被遮挡态都做了新一轮层次增强：
+    - 槽位更像嵌入式卡槽
+    - 麻将砖增加更明显的高光、厚度和底部阴影
+    - 被遮挡牌不再只是变淡，而是更像“压在下面”的后退层
+    - 角标字号和清晰度提升，单局里读牌更稳定
+
+Verification
+- `npm run test -- --run`
+- `npm run lint`
+- `npm run build`
+- 新截图:
+  - `output/web-game/pixel-board-refresh-level-1-v2/shot-0.png`
+- 核对结果:
+  - 27 个测试全部通过
+  - lint 通过
+  - build 通过
+  - 新单局截图里已能看到更清楚的角标、中心压纹和更明显的上下层差
+
+Assumption
+- 这轮把“下叠 2 层之后就不可以对消了”按“只有顶部槽最右侧刚形成的那对才会清除，内部/埋住的对子不清除”来实现。
+
+---
+
+Task
+- 用户新需求: 让单局棋盘更满铺、去掉棋盘多余涂层、把牌堆改成更错落的不规则堆叠，并修掉对消时顶部槽拉成长条的 bug。
+
+What changed
+- `src/game/levels.ts`
+  - 重做 `stack48 / stack60 / stack72 / stack84` 四套模板，不再走按行居中的规则排布。
+  - 现在全部改成手工定义的非对称坐标：
+    - 顶层和中层更偏移
+    - 下半区更满
+    - 同层不再保持整齐行列
+- `src/App.tsx`
+  - 去掉顶部槽里的 `match-burst` 可视节点，配对成功后不再渲染额外飞牌层。
+- `src/App.css`
+  - 去掉 `tray-panel--play::before` 的托盘亮带。
+  - 去掉 `board-surface::after` 的内框玻璃边。
+  - 大幅减弱 `board-shell` / `board-surface` 的高光洗层，只保留轻桌布网格。
+  - 收紧棋盘容器边距，并同步微调槽位与棋盘间距，让有效显示区更大。
+
+Verification
+- `npm run test -- --run`
+- `npm run lint`
+- `npm run build`
+- 浏览器验收产物:
+  - `output/web-game/pixel-board-refresh-verify/full-level-1.png`
+  - `output/web-game/pixel-board-refresh-verify/match-window.png`
+  - `output/web-game/pixel-board-refresh-verify/full-level-20.png`
+  - `output/web-game/pixel-board-refresh-verify/state.json`
+- 核对结果:
+  - 27 个测试全部通过
+  - 第 1 关和第 20 关截图里牌堆明显比上一版更分散、更满，不再是规则小方阵
+  - 棋盘内框涂层和托盘亮带已去掉
+  - 对消瞬间顶部槽保持单行 4 格，没有再出现长条拉伸 bug
+
+Follow-up fix
+- 用户补报“消除后出现 4 个额外格子”的旧截图问题。
+- 复查后确认当前分支的 `tray-grid` 在配对后 DOM 只有 4 个槽位；额外格子来自旧版 `match-burst` 飞牌节点进入了网格布局。
+- 已继续清理 `src/App.css` 中遗留的 `match-burst` 样式定义，避免旧动画路径被误触发。
+- 浏览器脚本实测：
+  - 配对后 `tray-grid.children.length === 4`
+  - `burstCount === 0`
+  - `placeholderCount === 4`

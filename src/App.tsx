@@ -585,6 +585,21 @@ function renderMahjongGlyph(theme: TileTheme) {
   }
 }
 
+function getBadgeFamilyLabel(family: TileTheme['badgeFamily']) {
+  switch (family) {
+    case 'animal':
+      return '兽'
+    case 'dots':
+      return '圈'
+    case 'bamboo':
+      return '条'
+    case 'symbol':
+      return '纹'
+    default:
+      return ''
+  }
+}
+
 function CardFace({
   theme,
   mood,
@@ -594,12 +609,25 @@ function CardFace({
   mood: TileMood
   compact?: boolean
 }) {
+  const familyLabel = getBadgeFamilyLabel(theme.badgeFamily)
+
   return (
     <span className={`card-face card-face--${mood}${compact ? ' card-face--compact' : ''}`} aria-hidden="true">
+      <span className="card-face__plate" />
+      <span className="card-face__medallion" />
+      <span className="card-face__corner card-face__corner--top">
+        <strong>{theme.label}</strong>
+        <em>{familyLabel}</em>
+      </span>
       <svg viewBox="0 0 96 112" className="card-face__art" focusable="false">
         {renderMahjongGlyph(theme)}
       </svg>
-      <span className="card-face__badge">{theme.label}</span>
+      {!compact ? (
+        <span className="card-face__corner card-face__corner--bottom">
+          <strong>{theme.label}</strong>
+          <em>{familyLabel}</em>
+        </span>
+      ) : null}
     </span>
   )
 }
@@ -649,13 +677,6 @@ function getTrayStyle(tileType: TileType, config: GameConfig) {
     '--tile-shadow': theme.shadowGlow,
     '--tile-pattern': theme.facePattern,
     '--entry-duration': `${config.animationMs.trayEntry}ms`,
-  } as CSSProperties
-}
-
-function getBurstStyle(slotIndex: number) {
-  return {
-    gridColumnStart: slotIndex + 1,
-    gridRowStart: 1,
   } as CSSProperties
 }
 
@@ -1522,19 +1543,6 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                     </div>
                   )
                 })}
-
-                {state.matchBursts.map((burst) => (
-                  <div
-                    key={burst.id}
-                    className="match-burst"
-                    style={getBurstStyle(burst.slotIndex)}
-                    aria-hidden="true"
-                  >
-                    <span style={getTrayStyle(burst.type, config)}>
-                      <CardFace theme={TILE_THEMES[burst.type]} mood="burst" compact />
-                    </span>
-                  </div>
-                ))}
               </div>
             </section>
 

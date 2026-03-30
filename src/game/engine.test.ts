@@ -174,6 +174,30 @@ describe('game engine', () => {
     expect(settledState.resolvedMatchIds).toHaveLength(0)
   })
 
+  it('does not clear a buried internal pair after newer tiles stack above it', () => {
+    const level = createLevel([
+      { id: 'ember-2', type: 'ember', x: 0, y: 0, layer: 0 },
+      { id: 'cloud-1', type: 'cloud', x: 80, y: 0, layer: 0 },
+    ])
+
+    let state = createInitialGameState(level, 'playing')
+    state = {
+      ...state,
+      trayTiles: [
+        { entryId: 'ember-1', sourceTileId: 'ember-a', type: 'ember' },
+        { entryId: 'leaf-1', sourceTileId: 'leaf-a', type: 'leaf' },
+        { entryId: 'leaf-2', sourceTileId: 'leaf-b', type: 'leaf' },
+      ],
+      selectedCount: 3,
+    }
+
+    state = pickTile(state, 'ember-2', level, GAME_CONFIG)
+
+    expect(state.trayTiles.map((tile) => tile.type)).toEqual(['ember', 'leaf', 'leaf', 'ember'])
+    expect(state.matchBursts).toHaveLength(0)
+    expect(state.status).toBe('lost')
+  })
+
   it('marks the game as lost when the tray reaches capacity without an adjacent pair', () => {
     const level = createLevel([
       { id: 'ember', type: 'ember', x: 0, y: 0, layer: 0 },
@@ -282,8 +306,8 @@ describe('game engine', () => {
     const state = createInitialGameState(DEFAULT_LEVEL, 'playing')
     const exposedTiles = DEFAULT_LEVEL.tiles.filter((tile) => !isTileBlocked(tile.id, state, GAME_CONFIG))
 
-    expect(exposedTiles).toHaveLength(17)
-    expect(DEFAULT_LEVEL.tiles.filter((tile) => isTileBlocked(tile.id, state, GAME_CONFIG))).toHaveLength(31)
+    expect(exposedTiles).toHaveLength(18)
+    expect(DEFAULT_LEVEL.tiles.filter((tile) => isTileBlocked(tile.id, state, GAME_CONFIG))).toHaveLength(30)
   })
 
   it('starts the default level with four visible tile types and immediate safe pairs', () => {

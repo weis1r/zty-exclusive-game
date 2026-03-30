@@ -68,16 +68,6 @@ interface LevelBlueprintInput {
 
 const BOARD_WIDTH = 344
 const BOARD_HEIGHT = 568
-const TILE_WIDTH = 70
-const STEP_X = 54
-const STEP_Y = 58
-const LAYER_SHIFT_Y = 18
-const LAYER_SHIFT_X: Record<number, number> = {
-  0: 0,
-  1: 10,
-  2: -8,
-  3: 14,
-}
 
 function createTiles(slots: TileSlot[], types: TileType[]): TileDefinition[] {
   if (slots.length !== types.length) {
@@ -204,90 +194,111 @@ function buildLevelTypes(
   return types
 }
 
-function createCenteredRowSlots(count: number, y: number, layer: number, shiftX = 0): TileSlot[] {
-  const rowWidth = TILE_WIDTH + STEP_X * (count - 1)
-  const startX = Math.round((BOARD_WIDTH - rowWidth) / 2 + shiftX)
-
-  return Array.from({ length: count }, (_, index) => ({
-    x: startX + index * STEP_X,
-    y,
-    layer,
-  }))
-}
-
-function buildLayoutSlots(rowCountsByLayer: Record<number, number[]>, startY: number): TileSlot[] {
-  const slots: TileSlot[] = []
-
-  for (let layer = 3; layer >= 0; layer -= 1) {
-    const rowCounts = rowCountsByLayer[layer] ?? []
-
-    rowCounts.forEach((count, rowIndex) => {
-      const shiftX = LAYER_SHIFT_X[layer] + (rowIndex % 2 === 0 ? 0 : 6)
-      const y = startY + rowIndex * STEP_Y - layer * LAYER_SHIFT_Y
-
-      slots.push(...createCenteredRowSlots(count, y, layer, shiftX))
-    })
-  }
-
-  return slots
+function createLayoutSlots(
+  rows: Array<{
+    layer: number
+    y: number
+    xs: number[]
+  }>,
+) {
+  return rows.flatMap(({ layer, y, xs }) =>
+    xs.map((x) => ({
+      x,
+      y,
+      layer,
+    })),
+  )
 }
 
 const LEVEL_LAYOUTS: Record<LevelLayoutId, LevelLayoutDefinition> = {
   stack48: {
-    slots: buildLayoutSlots(
-      {
-        3: [3, 3],
-        2: [3, 4, 3],
-        1: [4, 3, 4, 3],
-        0: [4, 5, 5, 4],
-      },
-      248,
-    ),
+    slots: createLayoutSlots([
+      { layer: 3, y: 106, xs: [28, 118, 210] },
+      { layer: 3, y: 154, xs: [72, 162, 246] },
+      { layer: 2, y: 134, xs: [2, 94, 188] },
+      { layer: 2, y: 198, xs: [40, 132, 222, 266] },
+      { layer: 2, y: 258, xs: [18, 110, 202] },
+      { layer: 1, y: 170, xs: [0, 74, 160, 246] },
+      { layer: 1, y: 232, xs: [30, 122, 212] },
+      { layer: 1, y: 294, xs: [12, 100, 188, 262] },
+      { layer: 1, y: 356, xs: [46, 138, 228] },
+      { layer: 0, y: 208, xs: [0, 62, 146, 228, 274] },
+      { layer: 0, y: 270, xs: [28, 116, 204, 266] },
+      { layer: 0, y: 332, xs: [0, 84, 168, 246, 274] },
+      { layer: 0, y: 394, xs: [38, 126, 214, 274] },
+    ]),
     boardWidth: BOARD_WIDTH,
     boardHeight: BOARD_HEIGHT,
     openingCount: 6,
     tileCount: 48,
   },
   stack60: {
-    slots: buildLayoutSlots(
-      {
-        3: [3, 3],
-        2: [4, 4, 4],
-        1: [4, 5, 4, 5],
-        0: [5, 4, 5, 5, 5],
-      },
-      220,
-    ),
+    slots: createLayoutSlots([
+      { layer: 3, y: 92, xs: [18, 108, 198] },
+      { layer: 3, y: 138, xs: [62, 154, 244] },
+      { layer: 2, y: 118, xs: [0, 92, 184] },
+      { layer: 2, y: 174, xs: [34, 126, 216, 266] },
+      { layer: 2, y: 232, xs: [14, 86, 158, 230, 274] },
+      { layer: 1, y: 150, xs: [0, 74, 158, 242] },
+      { layer: 1, y: 206, xs: [24, 112, 198, 274] },
+      { layer: 1, y: 266, xs: [10, 92, 174, 248, 274] },
+      { layer: 1, y: 328, xs: [36, 116, 196, 248, 274] },
+      { layer: 0, y: 182, xs: [0, 56, 138, 220, 274] },
+      { layer: 0, y: 242, xs: [22, 106, 188, 270] },
+      { layer: 0, y: 302, xs: [0, 80, 162, 244, 274] },
+      { layer: 0, y: 362, xs: [16, 98, 180, 262] },
+      { layer: 0, y: 422, xs: [18, 84, 150, 212, 248, 274] },
+    ]),
     boardWidth: BOARD_WIDTH,
     boardHeight: BOARD_HEIGHT,
     openingCount: 6,
     tileCount: 60,
   },
   stack72: {
-    slots: buildLayoutSlots(
-      {
-        3: [4, 4],
-        2: [4, 4, 4, 4],
-        1: [5, 5, 5, 5],
-        0: [5, 5, 6, 6, 6],
-      },
-      198,
-    ),
+    slots: createLayoutSlots([
+      { layer: 3, y: 84, xs: [0, 82, 168, 254] },
+      { layer: 3, y: 134, xs: [44, 126, 210, 274] },
+      { layer: 2, y: 110, xs: [18, 100, 184, 266] },
+      { layer: 2, y: 166, xs: [0, 72, 154, 236] },
+      { layer: 2, y: 224, xs: [34, 118, 202, 274] },
+      { layer: 2, y: 282, xs: [12, 94, 178, 260] },
+      { layer: 1, y: 144, xs: [0, 84, 166, 248] },
+      { layer: 1, y: 202, xs: [20, 104, 188, 270] },
+      { layer: 1, y: 260, xs: [0, 80, 164, 246] },
+      { layer: 1, y: 320, xs: [28, 112, 196, 274] },
+      { layer: 1, y: 378, xs: [50, 134, 216, 274] },
+      { layer: 0, y: 178, xs: [0, 58, 140, 222, 274] },
+      { layer: 0, y: 236, xs: [24, 106, 188, 270] },
+      { layer: 0, y: 294, xs: [0, 78, 160, 242, 274] },
+      { layer: 0, y: 352, xs: [16, 98, 180, 262] },
+      { layer: 0, y: 410, xs: [0, 84, 166, 248, 274] },
+      { layer: 0, y: 468, xs: [32, 116, 198, 250, 274] },
+    ]),
     boardWidth: BOARD_WIDTH,
     boardHeight: BOARD_HEIGHT,
     openingCount: 8,
     tileCount: 72,
   },
   stack84: {
-    slots: buildLayoutSlots(
-      {
-        3: [5, 5],
-        2: [4, 5, 4, 5],
-        1: [6, 6, 6, 6],
-        0: [6, 5, 5, 5, 5, 6],
-      },
-      188,
-    ),
+    slots: createLayoutSlots([
+      { layer: 3, y: 78, xs: [0, 70, 152, 234, 274] },
+      { layer: 3, y: 126, xs: [30, 112, 194, 246, 274] },
+      { layer: 2, y: 104, xs: [12, 94, 176, 258] },
+      { layer: 2, y: 160, xs: [0, 66, 148, 230, 274] },
+      { layer: 2, y: 220, xs: [26, 108, 190, 272] },
+      { layer: 2, y: 278, xs: [8, 90, 172, 244, 274] },
+      { layer: 1, y: 138, xs: [0, 74, 156, 238, 274] },
+      { layer: 1, y: 196, xs: [18, 100, 182, 246, 274] },
+      { layer: 1, y: 254, xs: [0, 82, 164, 246] },
+      { layer: 1, y: 314, xs: [26, 108, 190, 256, 274] },
+      { layer: 1, y: 372, xs: [48, 130, 212, 248, 274] },
+      { layer: 0, y: 170, xs: [0, 52, 122, 196, 270] },
+      { layer: 0, y: 226, xs: [20, 94, 168, 242, 274] },
+      { layer: 0, y: 282, xs: [0, 72, 146, 220, 274] },
+      { layer: 0, y: 338, xs: [16, 90, 164, 238, 274] },
+      { layer: 0, y: 394, xs: [0, 62, 136, 210, 250, 274] },
+      { layer: 0, y: 450, xs: [32, 106, 180, 222, 248, 274] },
+    ]),
     boardWidth: BOARD_WIDTH,
     boardHeight: BOARD_HEIGHT,
     openingCount: 10,
