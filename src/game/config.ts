@@ -3,12 +3,12 @@ import type { GameConfig, TileTheme, TileType } from './types'
 export const GAME_CONFIG: GameConfig = {
   matchCount: 2,
   trayCapacity: 4,
-  boardWidth: 360,
-  boardHeight: 520,
-  tileWidth: 76,
-  tileHeight: 92,
-  blockerOverlapX: 52,
-  blockerOverlapY: 56,
+  boardWidth: 338,
+  boardHeight: 338,
+  tileWidth: 44,
+  tileHeight: 54,
+  blockerOverlapX: 30,
+  blockerOverlapY: 36,
   boardScaleBase: 1,
   animationMs: {
     matchClear: 280,

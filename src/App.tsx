@@ -1481,7 +1481,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
 
             <div className="intro-rules">
               <div className="rule-chip">Vita 风格二消</div>
-              <div className="rule-chip">顶部四格配对槽</div>
+              <div className="rule-chip">顺序入槽，相邻才消</div>
               <div className="rule-chip">提示 / 撤销道具</div>
             </div>
 
@@ -1656,7 +1656,7 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
                 <p className="tray-tip">
                   {isResolvingMatch
                     ? '正在结算二消...'
-                    : `同类头像两张即消，最多只留 ${config.trayCapacity} 张`}
+                    : `只有相邻连在一起的两张头像才会消，最多只留 ${config.trayCapacity} 张`}
                 </p>
               </div>
 
@@ -1735,9 +1735,11 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
               className="board-shell"
               style={
                 {
-                  '--board-width': `${config.boardWidth}px`,
-                  '--board-height': `${config.boardHeight}px`,
+                  '--board-width': `${currentLevel.boardWidth || config.boardWidth}px`,
+                  '--board-height': `${currentLevel.boardHeight || config.boardHeight}px`,
                   '--board-scale': config.boardScaleBase,
+                  '--tile-width': `${config.tileWidth}px`,
+                  '--tile-height': `${config.tileHeight}px`,
                   ...getChapterThemeStyle(selectedChapterTheme),
                 } as CSSProperties
               }

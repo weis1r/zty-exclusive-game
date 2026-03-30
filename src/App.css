@@ -1074,7 +1074,7 @@
 .board-shell__sticker {
   top: 8px;
   right: 8px;
-  width: 96px;
+  width: 72px;
   opacity: 0.94;
 }
 
@@ -1083,7 +1083,7 @@
   width: min(100%, var(--board-width));
   max-width: var(--board-width);
   aspect-ratio: calc(var(--board-width) / var(--board-height));
-  min-height: clamp(360px, 72vh, var(--board-height));
+  min-height: var(--board-height);
   margin: 0 auto;
   border-radius: 24px;
   background:
@@ -1131,8 +1131,8 @@
 
 .tile-card {
   position: absolute;
-  width: 76px;
-  height: 92px;
+  width: var(--tile-width, 76px);
+  height: var(--tile-height, 92px);
   padding: 0;
   border: 0;
   background: transparent;
@@ -1167,7 +1167,7 @@
 .tile-card__face {
   position: absolute;
   inset: 0;
-  border-radius: 22px;
+  border-radius: 16px;
 }
 
 .tile-card__shadow {
@@ -1206,7 +1206,7 @@
 
 .tile-card__face::before {
   inset: 4px;
-  border-radius: 17px;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
@@ -1252,9 +1252,9 @@
 .tile-card__badge {
   top: 7px;
   right: 7px;
-  width: 20px;
-  height: 20px;
-  font-size: 0.76rem;
+  width: 16px;
+  height: 16px;
+  font-size: 0.62rem;
 }
 
 .tile-mascot {
@@ -1266,7 +1266,7 @@
 }
 
 .tile-mascot__svg {
-  width: min(100%, 74px);
+  width: min(100%, calc(var(--tile-width, 76px) - 6px));
   height: auto;
   filter: drop-shadow(0 6px 8px rgba(36, 22, 58, 0.14));
   transition: transform 160ms ease;
@@ -1327,7 +1327,7 @@
 }
 
 .tile-mascot--compact .tile-mascot__svg {
-  width: min(100%, 58px);
+  width: min(100%, calc(var(--tile-width, 76px) - 14px));
 }
 
 .tile-card:not(.is-blocked):hover .tile-mascot--board-active .tile-mascot__svg {

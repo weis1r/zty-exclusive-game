@@ -4,8 +4,8 @@ import {
   canUseUndo,
   clearResolvedMatches,
   createInitialGameState,
-  getRemainingBoardTiles,
   getHintSuggestion,
+  getRemainingBoardTiles,
   insertIntoTray,
   isTileBlocked,
   pickTile,
@@ -14,7 +14,7 @@ import {
   useUndo,
 } from './engine'
 import { CAMPAIGN, CAMPAIGN_LEVELS, DEFAULT_LEVEL, getCampaignChapters } from './levels'
-import type { LevelDefinition, TrayTile } from './types'
+import type { LevelDefinition, TileType, TrayTile } from './types'
 
 function createLevel(tiles: LevelDefinition['tiles']): LevelDefinition {
   return {
@@ -26,31 +26,10 @@ function createLevel(tiles: LevelDefinition['tiles']): LevelDefinition {
   }
 }
 
-function serializeState(level: LevelDefinition, state: ReturnType<typeof createInitialGameState>) {
-  const removedTiles = level.tiles
-    .filter((tile) => state.boardTiles.find((boardTile) => boardTile.id === tile.id)?.removed)
-    .map((tile) => tile.id)
-    .join(',')
-
-  return `${removedTiles}|${state.trayTiles.map((tile) => tile.type).join(',')}|${state.status}`
-}
-
-function getExposedTilesByPriority(state: ReturnType<typeof createInitialGameState>) {
-  const trayTypeCounts = state.trayTiles.reduce<Map<string, number>>((counts, tile) => {
-    counts.set(tile.type, (counts.get(tile.type) ?? 0) + 1)
-    return counts
-  }, new Map())
-
+function getExposedTiles(state: ReturnType<typeof createInitialGameState>) {
   return getRemainingBoardTiles(state)
     .filter((tile) => !isTileBlocked(tile.id, state, GAME_CONFIG))
     .sort((leftTile, rightTile) => {
-      const leftTrayCount = trayTypeCounts.get(leftTile.type) ?? 0
-      const rightTrayCount = trayTypeCounts.get(rightTile.type) ?? 0
-
-      if (leftTrayCount !== rightTrayCount) {
-        return rightTrayCount - leftTrayCount
-      }
-
       if (leftTile.layer !== rightTile.layer) {
         return rightTile.layer - leftTile.layer
       }
@@ -63,55 +42,66 @@ function getExposedTilesByPriority(state: ReturnType<typeof createInitialGameSta
     })
 }
 
-function findWinningPath(level: LevelDefinition, maxVisited = 300_000): string[] | null {
-  const seenStates = new Set<string>()
-  let visitedCount = 0
-
-  function search(
-    state: ReturnType<typeof createInitialGameState>,
-  ): string[] | null {
-    const settledState =
-      state.matchBursts.length > 0 ? clearResolvedMatches(state) : state
-
-    if (settledState.status === 'won') {
-      return []
-    }
-
-    if (settledState.status === 'lost') {
-      return null
-    }
-
-    const stateKey = serializeState(level, settledState)
-
-    if (seenStates.has(stateKey) || visitedCount >= maxVisited) {
-      return null
-    }
-
-    seenStates.add(stateKey)
-    visitedCount += 1
-
-    for (const tile of getExposedTilesByPriority(settledState)) {
-      const nextState = pickTile(settledState, tile.id, level, GAME_CONFIG)
-
-      if (nextState === settledState) {
-        continue
-      }
-
-      const nextPath = search(nextState)
-
-      if (nextPath) {
-        return [tile.id, ...nextPath]
-      }
-    }
-
-    return null
-  }
-
-  return search(createInitialGameState(level, 'playing'))
-}
-
 function getLevelUniqueTypeCount(level: LevelDefinition) {
   return new Set(level.tiles.map((tile) => tile.type)).size
+}
+
+function findGreedyWinningPath(level: LevelDefinition): string[] | null {
+  const path: string[] = []
+  let state = createInitialGameState(level, 'playing')
+  let guard = 0
+
+  while (state.status === 'playing' && guard < level.tiles.length * 2) {
+    if (state.matchBursts.length > 0) {
+      state = clearResolvedMatches(state)
+    }
+
+    const exposedTiles = getExposedTiles(state)
+    const tailType = state.trayTiles.at(-1)?.type ?? null
+    const nextPickIds: string[] = []
+
+    if (tailType) {
+      const tailMatchTile = exposedTiles.find((tile) => tile.type === tailType)
+
+      if (tailMatchTile) {
+        nextPickIds.push(tailMatchTile.id)
+      }
+    }
+
+    if (
+      nextPickIds.length === 0 &&
+      state.trayTiles.length <= GAME_CONFIG.trayCapacity - GAME_CONFIG.matchCount
+    ) {
+      const pairByType = new Map<TileType, string[]>()
+
+      exposedTiles.forEach((tile) => {
+        pairByType.set(tile.type, [...(pairByType.get(tile.type) ?? []), tile.id])
+      })
+
+      const safePair = [...pairByType.values()].find((tileIds) => tileIds.length >= GAME_CONFIG.matchCount)
+
+      if (safePair) {
+        nextPickIds.push(...safePair.slice(0, GAME_CONFIG.matchCount))
+      }
+    }
+
+    if (nextPickIds.length === 0) {
+      return null
+    }
+
+    nextPickIds.forEach((tileId) => {
+      state = pickTile(state, tileId, level, GAME_CONFIG)
+      path.push(tileId)
+
+      if (state.matchBursts.length > 0) {
+        state = clearResolvedMatches(state)
+      }
+    })
+
+    guard += 1
+  }
+
+  return state.status === 'won' ? path : null
 }
 
 describe('game engine', () => {
@@ -126,7 +116,7 @@ describe('game engine', () => {
     expect(isTileBlocked('top', state, GAME_CONFIG)).toBe(false)
   })
 
-  it('groups same tile types together when adding to the tray', () => {
+  it('preserves tray insertion order instead of auto-grouping same tiles', () => {
     const trayTiles: TrayTile[] = [
       { entryId: 'ember-1', sourceTileId: 'ember-a', type: 'ember' },
       { entryId: 'leaf-1', sourceTileId: 'leaf-a', type: 'leaf' },
@@ -138,10 +128,27 @@ describe('game engine', () => {
       type: 'ember',
     })
 
-    expect(result.map((tile) => tile.type)).toEqual(['ember', 'ember', 'leaf'])
+    expect(result.map((tile) => tile.type)).toEqual(['ember', 'leaf', 'ember'])
   })
 
-  it('clears a match of two identical tiles and blocks new picks during the clear animation window', () => {
+  it('does not clear a separated ABAC tray pattern', () => {
+    const level = createLevel([
+      { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
+      { id: 'leaf-1', type: 'leaf', x: 60, y: 0, layer: 0 },
+      { id: 'ember-2', type: 'ember', x: 120, y: 0, layer: 0 },
+      { id: 'cloud-1', type: 'cloud', x: 180, y: 0, layer: 0 },
+    ])
+
+    let state = createInitialGameState(level, 'playing')
+    state = pickTile(state, 'ember-1', level, GAME_CONFIG)
+    state = pickTile(state, 'leaf-1', level, GAME_CONFIG)
+    state = pickTile(state, 'ember-2', level, GAME_CONFIG)
+
+    expect(state.trayTiles.map((tile) => tile.type)).toEqual(['ember', 'leaf', 'ember'])
+    expect(state.matchBursts).toHaveLength(0)
+  })
+
+  it('clears only adjacent pairs and blocks new picks during the clear animation window', () => {
     const level = createLevel([
       { id: 'ember-1', type: 'ember', x: 40, y: 40, layer: 0 },
       { id: 'ember-2', type: 'ember', x: 130, y: 40, layer: 0 },
@@ -167,16 +174,13 @@ describe('game engine', () => {
     expect(settledState.resolvedMatchIds).toHaveLength(0)
   })
 
-  it('marks the game as lost when the tray reaches capacity without a match', () => {
+  it('marks the game as lost when the tray reaches capacity without an adjacent pair', () => {
     const level = createLevel([
       { id: 'ember', type: 'ember', x: 0, y: 0, layer: 0 },
       { id: 'leaf', type: 'leaf', x: 80, y: 0, layer: 0 },
       { id: 'bloom', type: 'bloom', x: 160, y: 0, layer: 0 },
       { id: 'bell', type: 'bell', x: 240, y: 0, layer: 0 },
       { id: 'cloud', type: 'cloud', x: 0, y: 100, layer: 0 },
-      { id: 'shell', type: 'shell', x: 80, y: 100, layer: 0 },
-      { id: 'berry', type: 'berry', x: 160, y: 100, layer: 0 },
-      { id: 'wave', type: 'wave', x: 240, y: 100, layer: 0 },
     ])
 
     let state = createInitialGameState(level, 'playing')
@@ -212,12 +216,12 @@ describe('game engine', () => {
     expect(restartedState.boardTiles.every((tile) => !tile.removed)).toBe(true)
   })
 
-  it('recommends a matching tile and consumes a hint charge', () => {
+  it('recommends matching the tray tail and consumes a hint charge', () => {
     const level = createLevel([
       { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },
       { id: 'ember-2', type: 'ember', x: 80, y: 0, layer: 0 },
-      { id: 'ember-3', type: 'ember', x: 160, y: 0, layer: 0 },
-      { id: 'leaf-1', type: 'leaf', x: 0, y: 100, layer: 0 },
+      { id: 'leaf-1', type: 'leaf', x: 160, y: 0, layer: 0 },
+      { id: 'leaf-2', type: 'leaf', x: 240, y: 0, layer: 0 },
     ])
 
     let state = createInitialGameState(level, 'playing')
@@ -252,96 +256,82 @@ describe('game engine', () => {
     expect(undoneState.assistCharges.undo).toBe(progressedState.assistCharges.undo - 1)
   })
 
-  it('ships a 6-level campaign and keeps the default level pair-matchable', () => {
+  it('ships a 20-level campaign and keeps the default level built as a 144-item stack', () => {
     const tileCounts = DEFAULT_LEVEL.tiles.reduce<Record<string, number>>((counts, tile) => {
       counts[tile.type] = (counts[tile.type] ?? 0) + 1
       return counts
     }, {})
 
-    expect(CAMPAIGN_LEVELS).toHaveLength(6)
-    expect(getCampaignChapters(CAMPAIGN)).toHaveLength(2)
+    expect(CAMPAIGN_LEVELS).toHaveLength(20)
+    expect(getCampaignChapters(CAMPAIGN)).toHaveLength(5)
     expect(DEFAULT_LEVEL.id).toBe('thorn-garden-01')
     expect(DEFAULT_LEVEL.name).toBe('荆棘迷圃')
     expect(DEFAULT_LEVEL.difficulty).toBe('easy')
-    expect(DEFAULT_LEVEL.tiles).toHaveLength(20)
-    expect(Object.values(tileCounts).every((count) => count % GAME_CONFIG.matchCount === 0)).toBe(
-      true,
-    )
+    expect(DEFAULT_LEVEL.tiles).toHaveLength(144)
+    expect(Object.values(tileCounts).every((count) => count % GAME_CONFIG.matchCount === 0)).toBe(true)
   })
 
-  it('starts the default level with only the top six tiles exposed', () => {
+  it('starts the default level with a compact visible opening layer', () => {
     const state = createInitialGameState(DEFAULT_LEVEL, 'playing')
-    const exposedTileIds = DEFAULT_LEVEL.tiles
-      .filter((tile) => !isTileBlocked(tile.id, state, GAME_CONFIG))
-      .map((tile) => tile.id)
-      .sort()
+    const exposedTiles = DEFAULT_LEVEL.tiles.filter((tile) => !isTileBlocked(tile.id, state, GAME_CONFIG))
 
-    expect(exposedTileIds).toEqual(
-      ['bloom-1', 'bloom-2', 'ember-1', 'ember-2', 'leaf-1', 'leaf-2'].sort(),
-    )
-    expect(DEFAULT_LEVEL.tiles.filter((tile) => isTileBlocked(tile.id, state, GAME_CONFIG))).toHaveLength(14)
+    expect(exposedTiles).toHaveLength(26)
+    expect(DEFAULT_LEVEL.tiles.filter((tile) => isTileBlocked(tile.id, state, GAME_CONFIG))).toHaveLength(118)
   })
 
-  it('gives the default level three immediate pairs at the start', () => {
+  it('starts the default level with four visible tile types and immediate safe pairs', () => {
     const state = createInitialGameState(DEFAULT_LEVEL, 'playing')
-    const exposedTypeCounts = DEFAULT_LEVEL.tiles
-      .filter((tile) => !isTileBlocked(tile.id, state, GAME_CONFIG))
-      .reduce<Record<string, number>>((counts, tile) => {
-        counts[tile.type] = (counts[tile.type] ?? 0) + 1
-        return counts
-      }, {})
+    const exposedTiles = getExposedTiles(state)
+    const exposedTypeCounts = exposedTiles.reduce<Record<string, number>>((counts, tile) => {
+      counts[tile.type] = (counts[tile.type] ?? 0) + 1
+      return counts
+    }, {})
 
-    expect(exposedTypeCounts).toEqual({
-      bloom: 2,
-      ember: 2,
-      leaf: 2,
-    })
+    expect(Object.keys(exposedTypeCounts)).toHaveLength(4)
+    expect(Object.values(exposedTypeCounts).every((count) => count >= 4)).toBe(true)
   })
 
-  it('keeps the 6-level campaign on the intended tile variety curve', () => {
-    const expectedTypeCurve = [5, 6, 7, 6, 6, 6]
-    const uniqueTypeCounts = CAMPAIGN_LEVELS.map((level) => getLevelUniqueTypeCount(level))
-
-    expect(uniqueTypeCounts).toEqual(expectedTypeCurve)
-    expect(uniqueTypeCounts[2]).toBeGreaterThan(uniqueTypeCounts[0])
-    expect(uniqueTypeCounts.slice(3).every((count) => count === 6)).toBe(true)
-  })
-
-  it('keeps assist charges on the intended campaign curve', () => {
-    expect(CAMPAIGN_LEVELS.map((level) => level.campaign?.startingAssists)).toEqual([
-      { undo: 2, hint: 2 },
-      { undo: 2, hint: 2 },
-      { undo: 2, hint: 1 },
-      { undo: 2, hint: 1 },
-      { undo: 1, hint: 1 },
-      { undo: 1, hint: 1 },
+  it('ramps tile variety across the 20-level campaign', () => {
+    expect(CAMPAIGN_LEVELS.map((level) => getLevelUniqueTypeCount(level))).toEqual([
+      4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 9, 9,
     ])
   })
 
-  it('supports a full winning solution path on the default easy level', () => {
-    const winningPath = findWinningPath(DEFAULT_LEVEL)
+  it('keeps assist charges on the intended difficulty curve', () => {
+    expect(CAMPAIGN_LEVELS.map((level) => level.campaign?.startingAssists)).toEqual([
+      { undo: 2, hint: 2 },
+      { undo: 2, hint: 2 },
+      { undo: 2, hint: 2 },
+      { undo: 2, hint: 2 },
+      { undo: 2, hint: 1 },
+      { undo: 2, hint: 1 },
+      { undo: 2, hint: 1 },
+      { undo: 2, hint: 1 },
+      { undo: 1, hint: 1 },
+      { undo: 1, hint: 1 },
+      { undo: 1, hint: 1 },
+      { undo: 1, hint: 1 },
+      { undo: 1, hint: 1 },
+      { undo: 1, hint: 1 },
+      { undo: 1, hint: 1 },
+      { undo: 1, hint: 1 },
+      { undo: 1, hint: 1 },
+      { undo: 1, hint: 1 },
+      { undo: 1, hint: 0 },
+      { undo: 1, hint: 0 },
+    ])
+  })
+
+  it('supports a full greedy winning solution path on the default level', () => {
+    const winningPath = findGreedyWinningPath(DEFAULT_LEVEL)
 
     expect(winningPath).not.toBeNull()
     expect(winningPath).toHaveLength(DEFAULT_LEVEL.tiles.length)
-
-    let state = createInitialGameState(DEFAULT_LEVEL, 'playing')
-
-    for (const tileId of winningPath ?? []) {
-      state = pickTile(state, tileId, DEFAULT_LEVEL, GAME_CONFIG)
-
-      if (state.matchBursts.length > 0) {
-        state = clearResolvedMatches(state)
-      }
-    }
-
-    expect(state.status).toBe('won')
-    expect(state.trayTiles).toHaveLength(0)
-    expect(state.boardTiles.every((tile) => tile.removed)).toBe(true)
   })
 
-  it('keeps every shipped campaign level solvable', () => {
+  it('keeps every shipped campaign level solvable with safe adjacent-pair play', () => {
     const unsolvedLevels = CAMPAIGN_LEVELS.flatMap((level) => {
-      const winningPath = findWinningPath(level)
+      const winningPath = findGreedyWinningPath(level)
 
       if (!winningPath || winningPath.length !== level.tiles.length) {
         return [level.id]

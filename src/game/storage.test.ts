@@ -148,7 +148,7 @@ describe('campaign helpers and storage', () => {
     ).not.toBeNull()
   })
 
-  it('rebuilds missing level and chapter records for a fully cleared v2 save', () => {
+  it('unlocks newly appended levels when an old save had already cleared the former final stage', () => {
     window.localStorage.setItem(
       `brick-match:campaign-progress:${CAMPAIGN.id}`,
       JSON.stringify({
@@ -181,8 +181,9 @@ describe('campaign helpers and storage', () => {
 
     expect(progress.currentLevelId).toBe('crown-greenhouse-06')
     expect(progress.levelRecords['crown-greenhouse-06'].completed).toBe(true)
+    expect(progress.levelRecords['sunset-orchard-07'].unlocked).toBe(true)
+    expect(progress.unlockedLevelIds).toContain('sunset-orchard-07')
     expect(progress.chapterRecords['chapter-mirror-court'].completed).toBe(true)
-    expect(progress.unlockedLevelIds).toHaveLength(CAMPAIGN.levels.length)
   })
 
   it('resets persisted progress back to the opening level', () => {

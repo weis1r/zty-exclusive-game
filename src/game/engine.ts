@@ -51,38 +51,47 @@ function resolveTrayMatches(
   trayTiles: TrayTile[],
   matchCount: number,
 ): { nextTrayTiles: TrayTile[]; matchBursts: MatchBurst[] } {
-  const typeCounts = new Map<string, number>()
-
-  trayTiles.forEach((trayTile) => {
-    typeCounts.set(trayTile.type, (typeCounts.get(trayTile.type) ?? 0) + 1)
-  })
-
-  const removalsByType = new Map<string, number>()
-
-  typeCounts.forEach((count, type) => {
-    if (count >= matchCount) {
-      removalsByType.set(type, Math.floor(count / matchCount) * matchCount)
-    }
-  })
-
-  const nextTrayTiles: TrayTile[] = []
   const matchBursts: MatchBurst[] = []
+  let nextTrayTiles = [...trayTiles]
+  let foundMatch = true
 
-  trayTiles.forEach((trayTile, slotIndex) => {
-    const remainingRemovals = removalsByType.get(trayTile.type) ?? 0
+  while (foundMatch) {
+    foundMatch = false
 
-    if (remainingRemovals > 0) {
-      removalsByType.set(trayTile.type, remainingRemovals - 1)
-      matchBursts.push({
-        id: trayTile.entryId,
-        slotIndex,
-        type: trayTile.type,
-      })
-      return
+    for (let cursor = 0; cursor < nextTrayTiles.length; cursor += 1) {
+      const runStart = cursor
+      const runType = nextTrayTiles[cursor].type
+
+      while (cursor + 1 < nextTrayTiles.length && nextTrayTiles[cursor + 1].type === runType) {
+        cursor += 1
+      }
+
+      const runLength = cursor - runStart + 1
+
+      if (runLength < matchCount) {
+        continue
+      }
+
+      const removableCount = Math.floor(runLength / matchCount) * matchCount
+
+      for (let offset = 0; offset < removableCount; offset += 1) {
+        const trayTile = nextTrayTiles[runStart + offset]
+
+        matchBursts.push({
+          id: trayTile.entryId,
+          slotIndex: runStart + offset,
+          type: trayTile.type,
+        })
+      }
+
+      nextTrayTiles = [
+        ...nextTrayTiles.slice(0, runStart),
+        ...nextTrayTiles.slice(runStart + removableCount),
+      ]
+      foundMatch = true
+      break
     }
-
-    nextTrayTiles.push(trayTile)
-  })
+  }
 
   return {
     nextTrayTiles,
@@ -115,14 +124,27 @@ function pushHistory(state: GameState): GameStateSnapshot[] {
   return nextHistory.slice(-20)
 }
 
-function getTrayTypeCounts(trayTiles: TrayTile[]) {
-  const counts = new Map<TileType, number>()
+function getTrayTailRun(trayTiles: TrayTile[]) {
+  const lastTrayTile = trayTiles.at(-1)
 
-  trayTiles.forEach((trayTile) => {
-    counts.set(trayTile.type, (counts.get(trayTile.type) ?? 0) + 1)
-  })
+  if (!lastTrayTile) {
+    return null
+  }
 
-  return counts
+  let count = 0
+
+  for (let index = trayTiles.length - 1; index >= 0; index -= 1) {
+    if (trayTiles[index].type !== lastTrayTile.type) {
+      break
+    }
+
+    count += 1
+  }
+
+  return {
+    type: lastTrayTile.type,
+    count,
+  }
 }
 
 function getSortedExposedTiles(state: GameState, config: GameConfig): BoardTileState[] {
@@ -217,19 +239,7 @@ export function isTileBlocked(
 }
 
 export function insertIntoTray(trayTiles: TrayTile[], nextTile: TrayTile): TrayTile[] {
-  const lastSameIndex = trayTiles.findLastIndex(
-    (existingTile) => existingTile.type === nextTile.type,
-  )
-
-  if (lastSameIndex === -1) {
-    return [...trayTiles, nextTile]
-  }
-
-  return [
-    ...trayTiles.slice(0, lastSameIndex + 1),
-    nextTile,
-    ...trayTiles.slice(lastSameIndex + 1),
-  ]
+  return [...trayTiles, nextTile]
 }
 
 export function canUseUndo(state: GameState): boolean {
@@ -274,16 +284,17 @@ export function getHintSuggestion(
     return null
   }
 
-  const trayTypeCounts = getTrayTypeCounts(state.trayTiles)
   const exposedTypeCounts = new Map<TileType, number>()
 
   exposedTiles.forEach((tile) => {
     exposedTypeCounts.set(tile.type, (exposedTypeCounts.get(tile.type) ?? 0) + 1)
   })
 
-  const readyMatchTile = exposedTiles.find(
-    (tile) => (trayTypeCounts.get(tile.type) ?? 0) >= config.matchCount - 1,
-  )
+  const trayTailRun = getTrayTailRun(state.trayTiles)
+  const readyMatchTile =
+    trayTailRun && trayTailRun.count < config.matchCount
+      ? exposedTiles.find((tile) => tile.type === trayTailRun.type)
+      : null
 
   if (readyMatchTile) {
     return {
@@ -293,11 +304,11 @@ export function getHintSuggestion(
     }
   }
 
-  const traySetupTile = exposedTiles.find(
-    (tile) =>
-      (trayTypeCounts.get(tile.type) ?? 0) === 0 &&
-      (exposedTypeCounts.get(tile.type) ?? 0) >= config.matchCount,
-  )
+  const hasRoomForFreshPair =
+    state.trayTiles.length <= config.trayCapacity - config.matchCount
+  const traySetupTile = hasRoomForFreshPair
+    ? exposedTiles.find((tile) => (exposedTypeCounts.get(tile.type) ?? 0) >= config.matchCount)
+    : null
 
   if (traySetupTile) {
     return {
@@ -307,31 +318,7 @@ export function getHintSuggestion(
     }
   }
 
-  let bestType: TileType | null = null
-  let bestCount = -1
-
-  exposedTypeCounts.forEach((count, type) => {
-    if (count > bestCount) {
-      bestType = type
-      bestCount = count
-    }
-  })
-
-  if (!bestType) {
-    return null
-  }
-
-  const openLayerTile = exposedTiles.find((tile) => tile.type === bestType) ?? null
-
-  if (!openLayerTile) {
-    return null
-  }
-
-  return {
-    tileId: openLayerTile.id,
-    type: openLayerTile.type,
-    reason: 'open-layer',
-  }
+  return null
 }
 
 export function useHint(state: GameState, config: GameConfig): GameState {
