@@ -315,17 +315,7 @@ export function GameScreen({
       <div
         className="game-board"
         ref={boardShellRef}
-        style={
-          {
-            '--board-width': `${boardWidth}px`,
-            '--board-height': `${boardHeight}px`,
-            '--board-scale': boardScale,
-            '--scaled-board-width': `${scaledBoardWidth}px`,
-            '--scaled-board-height': `${scaledBoardHeight}px`,
-            '--board-offset-x': `${boardOffsetX}px`,
-            '--board-offset-y': `${boardOffsetY}px`,
-          } as CSSProperties
-        }
+        style={{ '--board-scale': boardScale } as CSSProperties}
       >
         {state.hintBursts.map((burst) => (
           <div
