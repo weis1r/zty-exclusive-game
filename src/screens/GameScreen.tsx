@@ -27,6 +27,13 @@ interface GameScreenProps {
   onUseUndo: () => void
 }
 
+const BOARD_TILE_WIDTH = 88
+const BOARD_TILE_HEIGHT = 113
+const BOARD_TILE_FACE_WIDTH = BOARD_TILE_WIDTH + 6
+const BOARD_TILE_FACE_HEIGHT = BOARD_TILE_HEIGHT + 8
+const BOARD_TILE_OFFSET_X = (BOARD_TILE_WIDTH - 72) / 2
+const BOARD_TILE_OFFSET_Y = (BOARD_TILE_HEIGHT - 92) / 2
+
 function getTileStyle(
   tile: TileDefinition,
   boardScale: number,
@@ -39,14 +46,16 @@ function getTileStyle(
   const rotate = ((Math.floor(seed / 5) % 7) - 3) * 0.8
 
   return {
-    left: `${boardOffsetX + tile.x * boardScale}px`,
-    top: `${boardOffsetY + tile.y * boardScale}px`,
-    width: `${72 * boardScale}px`,
-    height: `${92 * boardScale}px`,
+    left: `${boardOffsetX + tile.x * boardScale - BOARD_TILE_OFFSET_X * boardScale}px`,
+    top: `${boardOffsetY + tile.y * boardScale - BOARD_TILE_OFFSET_Y * boardScale}px`,
+    width: `${BOARD_TILE_WIDTH * boardScale}px`,
+    height: `${BOARD_TILE_HEIGHT * boardScale}px`,
     zIndex: tile.layer * 10 + Math.round(tile.y / 10),
     '--tile-offset-x': `${offsetX * boardScale}px`,
     '--tile-offset-y': `${offsetY * boardScale}px`,
     '--tile-rotate': `${rotate}deg`,
+    '--board-tile-face-width': `${BOARD_TILE_FACE_WIDTH * boardScale}px`,
+    '--board-tile-face-height': `${BOARD_TILE_FACE_HEIGHT * boardScale}px`,
   } as CSSProperties
 }
 

@@ -754,3 +754,14 @@ Verification
 Open notes
 - 这轮只动了 `src/` 下的玩法与样式，没有回滚工作区其他脏改动。
 - 当前本地预览仍可通过 `http://127.0.0.1:4178/` 查看最新构建结果。
+
+## 2026-03-31 Android back undo
+- 问题定位: WebView 聚焦时会先消费 `KEYCODE_BACK`，导致局内返回直接落到 WebView 历史后退，没有触发前端的撤销逻辑。
+- 修复: `MainActivity` 改为同时接管 `dispatchKeyEvent(KEYCODE_BACK)` 和 `OnBackPressedDispatcher`，统一先调用前端 `window.androidHandleBack()`。
+- 前端收口: `App.tsx` 暴露 `window.androidHandleBack`，局内优先撤销；`handleUseHint` / `handleUseUndo` 增加可用性保护。
+- 验证: 浏览器里 `window.androidHandleBack()` 可撤回一步；MuMu 中点入一张花牌后按安卓返回键，托盘花牌被撤回，撤销次数从 3 变 2。
+
+## 2026-03-31 Android confirm dialog
+- 问题定位: 单局左上角返回按钮点击后会进入 `window.confirm(...)`，但 Android WebView 没有正确接管 JS confirm，所以用户看到“按钮没反应”。
+- 修复: 新增 `GameWebChromeClient`，用原生 `AlertDialog` 接管 `onJsConfirm(...)`；`MainActivity` 为 `WebView` 显式设置该 client。
+- 验证: MuMu 中进入单局后点击左上角返回按钮，已能稳定弹出“确定要放弃这一局并返回首页吗？”确认框。

@@ -210,6 +210,22 @@ describe('game engine', () => {
     expect(state.trayTiles).toHaveLength(0)
   })
 
+  it('auto-wins when only three unresolved tiles remain including the tray tail', () => {
+    const level = createLevel([
+      { id: 'leaf-1', type: 'leaf', x: 0, y: 0, layer: 0 },
+      { id: 'bloom-1', type: 'bloom', x: 80, y: 0, layer: 0 },
+      { id: 'bell-1', type: 'bell', x: 160, y: 0, layer: 0 },
+    ])
+
+    let state = createInitialGameState(level, 'playing')
+    state = pickTile(state, 'leaf-1', level, GAME_CONFIG)
+
+    expect(state.status).toBe('won')
+    expect(state.lossReason).toBeNull()
+    expect(getRemainingBoardTiles(state)).toHaveLength(2)
+    expect(state.trayTiles).toHaveLength(1)
+  })
+
   it('restores the previous snapshot including elapsed time when undo is used', () => {
     const level = createLevel([
       { id: 'ember-1', type: 'ember', x: 0, y: 0, layer: 0 },

@@ -3,6 +3,7 @@ package com.zty.exclusivegame;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.KeyEvent;
 import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -17,9 +18,14 @@ import com.zty.exclusivegame.databinding.ActivityMainBinding;
 public class MainActivity extends AppCompatActivity {
   private static final String GAME_URL =
       "https://appassets.androidplatform.net/assets/web/index.html";
+  private static final String HANDLE_BACK_SCRIPT =
+      "(function(){try{return !!(window.androidHandleBack && window.androidHandleBack());}"
+          + "catch(e){return false;}})();";
 
   private ActivityMainBinding binding;
   private WebView webView;
+  private boolean awaitingBackResult = false;
+  private OnBackPressedCallback backPressedCallback;
 
   @Override
   protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -56,6 +62,7 @@ public class MainActivity extends AppCompatActivity {
     webView.setVerticalScrollBarEnabled(false);
     webView.setHorizontalScrollBarEnabled(false);
     webView.setOverScrollMode(WebView.OVER_SCROLL_NEVER);
+    webView.setWebChromeClient(new GameWebChromeClient(this));
 
     WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
         .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
@@ -91,22 +98,66 @@ public class MainActivity extends AppCompatActivity {
   }
 
   private void configureBackNavigation() {
-    getOnBackPressedDispatcher().addCallback(
-        this,
+    backPressedCallback =
         new OnBackPressedCallback(true) {
           @Override
           public void handleOnBackPressed() {
-            if (webView != null && webView.canGoBack()) {
-              webView.goBack();
-              return;
-            }
-
-            setEnabled(false);
-            getOnBackPressedDispatcher().onBackPressed();
-            setEnabled(true);
+            handleAndroidBack();
           }
+        };
+
+    getOnBackPressedDispatcher().addCallback(this, backPressedCallback);
+  }
+
+  private void handleAndroidBack() {
+    if (webView == null) {
+      fallbackToSystemBack();
+      return;
+    }
+
+    if (awaitingBackResult) {
+      return;
+    }
+
+    awaitingBackResult = true;
+    webView.evaluateJavascript(
+        HANDLE_BACK_SCRIPT,
+        value -> {
+          awaitingBackResult = false;
+
+          if ("true".equals(value)) {
+            return;
+          }
+
+          if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+            return;
+          }
+
+          fallbackToSystemBack();
         }
     );
+  }
+
+  private void fallbackToSystemBack() {
+    if (backPressedCallback == null) {
+      finish();
+      return;
+    }
+
+    backPressedCallback.setEnabled(false);
+    getOnBackPressedDispatcher().onBackPressed();
+    backPressedCallback.setEnabled(true);
+  }
+
+  @Override
+  public boolean dispatchKeyEvent(KeyEvent event) {
+    if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && event.getAction() == KeyEvent.ACTION_UP) {
+      handleAndroidBack();
+      return true;
+    }
+
+    return super.dispatchKeyEvent(event);
   }
 
   private void showLoading() {

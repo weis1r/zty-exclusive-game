@@ -377,15 +377,14 @@ function resolveGameStatus(
   remainingBoardTileCount: number,
   trayTiles: TrayTile[],
   trayCapacity: number,
+  orbitPockets: OrbitPocket[] = [],
 ): { status: GameStatus; lossReason: LossReason | null } {
-  if (remainingBoardTileCount <= 4 && trayTiles.length === 0) {
-    return {
-      status: 'won',
-      lossReason: null,
-    }
-  }
+  const unresolvedTileCount =
+    remainingBoardTileCount +
+    trayTiles.length +
+    orbitPockets.filter((pocketTile) => pocketTile !== null).length
 
-  if (remainingBoardTileCount === 0 && trayTiles.length === 0) {
+  if (unresolvedTileCount <= 4) {
     return {
       status: 'won',
       lossReason: null,
@@ -662,7 +661,12 @@ export function useHint(
     boardTiles: nextBoardTiles,
     trayTiles: nextTrayTiles,
     orbitPockets: cloneOrbitPockets(state.orbitPockets),
-    ...resolveGameStatus(remainingBoardTileCount, nextTrayTiles, config.trayCapacity),
+    ...resolveGameStatus(
+      remainingBoardTileCount,
+      nextTrayTiles,
+      config.trayCapacity,
+      state.orbitPockets,
+    ),
     removedCount: state.removedCount + suggestion.tileIds.length + suggestion.trayEntryIds.length,
     resolvedMatchIds: removedTrayTiles.map((tile) => tile.entryId),
     matchBursts: removedTrayTiles.map((tile) => ({
@@ -789,7 +793,12 @@ export function releasePocketToTray(
     ...state,
     trayTiles: nextTrayTiles,
     orbitPockets: nextOrbitPockets,
-    ...resolveGameStatus(remainingBoardTileCount, nextTrayTiles, config.trayCapacity),
+    ...resolveGameStatus(
+      remainingBoardTileCount,
+      nextTrayTiles,
+      config.trayCapacity,
+      nextOrbitPockets,
+    ),
     removedCount: state.removedCount + matchBursts.length,
     resolvedMatchIds: matchBursts.map((burst) => burst.id),
     matchBursts,
@@ -851,6 +860,7 @@ export function pickTile(
       remainingBoardTileCount,
       nextTrayTiles,
       config.trayCapacity,
+      state.orbitPockets,
     ),
     selectedCount: nextSelectionCount,
     removedCount: state.removedCount + matchBursts.length,

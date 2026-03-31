@@ -3,9 +3,11 @@ import './App.css'
 import { GAME_CONFIG } from './game/config'
 import {
   advanceGameTime,
+  canUseUndo,
   clearHint,
   clearResolvedMatches,
   createInitialGameState,
+  getHintSuggestion,
   getDisplayedTileType,
   getRemainingBoardTiles,
   getTileCycleState,
@@ -44,6 +46,7 @@ declare global {
   interface Window {
     render_game_to_text?: () => string
     advanceTime?: (ms: number) => Promise<void>
+    androidHandleBack?: () => boolean
   }
 }
 
@@ -585,6 +588,17 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   }
 
   function handleUseHint() {
+    const canUseHintNow =
+      state.status === 'playing' &&
+      state.assistCharges.hint > 0 &&
+      state.matchBursts.length === 0 &&
+      state.hintBursts.length === 0 &&
+      getHintSuggestion(state, currentLevel, config) !== null
+
+    if (!canUseHintNow) {
+      return
+    }
+
     setAssistUsage((currentUsage) => ({
       ...currentUsage,
       hintUsed: currentUsage.hintUsed + 1,
@@ -593,12 +607,46 @@ export function GameApp({ config = GAME_CONFIG, campaign = CAMPAIGN }: GameAppPr
   }
 
   function handleUseUndo() {
+    if (!canUseUndo(state)) {
+      return
+    }
+
     setAssistUsage((currentUsage) => ({
       ...currentUsage,
       undoUsed: currentUsage.undoUsed + 1,
     }))
     dispatch({ type: 'use-undo' })
   }
+
+  useEffect(() => {
+    window.androidHandleBack = () => {
+      if (settingsOpen) {
+        setSettingsOpen(false)
+        return true
+      }
+
+      if (screen === 'game') {
+        if (state.status === 'playing' && canUseUndo(state)) {
+          handleUseUndo()
+          return true
+        }
+
+        handleBackFromGame()
+        return true
+      }
+
+      if (screen === 'result') {
+        handleSecondaryResultAction()
+        return true
+      }
+
+      return false
+    }
+
+    return () => {
+      delete window.androidHandleBack
+    }
+  }, [handleBackFromGame, handleSecondaryResultAction, handleUseUndo, screen, settingsOpen, state])
 
   function handleResetProgress() {
     if (!window.confirm('要清空当前进度并从第 1 关重新开始吗？')) {
